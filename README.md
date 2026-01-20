@@ -2,26 +2,40 @@
 
 A "Bodyguard Ordering" simulation featuring high-performance 3D integration.
 
-## Tech Stack (BETH)
+## 1. Tech Stack (BETH + Three.js)
+* **Runtime:** Bun
+* **Server:** ElysiaJS (`@elysiajs/html`)
+* **Database:** Turso (LibSQL)
+* **Frontend:** HTMX + Tailwind CSS (v4)
+* **3D Engine:** Three.js (Managed via `SceneManager`)
+* **Maps:** Leaflet.js
 
-- **Runtime:** Bun
-- **Server:** ElysiaJS
-- **Database:** Turso (LibSQL)
-- **Frontend:** HTMX + Tailwind CSS (v4)
-- **3D Engine:** Three.js
-- **Maps:** Leaflet.js
+## 2. Architecture: The Persistent Layout
+To achieve the "Wow" factor, we use a Hybrid Rendering approach:
+* **The "App Shell" (`src/views/layout.tsx`):**
+  * Contains a fixed `#canvas-container` that holds the Three.js scene. This element *never* reloads.
+  * Contains a relative `#ui-layer` for HTML content.
+* **Navigation:** HTMX swaps the inner HTML of `#ui-layer`, leaving the 3D background intact.
+* **Bridge:** The Frontend talks to the 3D scene via `window.CustomEvent` or direct access to `window.Sentinel`.
 
-## Architecture: The Persistent Layout
-
-This project uses a "App Shell" pattern (`src/views/layout.tsx`).
-
-- **Canvas Container:** A fixed `div` (#canvas-container) holds the Three.js scene. It is _never_ swapped by HTMX.
-- **UI Layer:** A relative `main` (#ui-layer) holds the HTML content. HTMX swaps content here using `hx-swap="innerHTML"`.
-- **Event Bridge:** The Frontend talks to the 3D scene via `window.CustomEvent`.
-
-## Project Structure
-
-- `src/core/` - Shared utilities (SceneManager, DB Config).
-- `src/modules/` - Feature-based folders (Order, Mission, Auth).
-- `src/views/` - Shared layouts and components.
-- `src/public/` - Static assets (GLB models, Textures).
+## 3. Project Structure
+```text
+sentinel-global/
+├── src/
+│   ├── client/              # Browser-side TypeScript (3D Logic)
+│   │   ├── SceneManager.ts  # Singleton handling Three.js scene/camera/renderer
+│   │   └── index.ts         # Entry point (bundles to public/js/index.js)
+│   ├── core/                # Shared utilities & Config
+│   ├── modules/             # Feature logic (Order, Mission, etc.)
+│   ├── public/              # Static Assets (Served at /public)
+│   │   ├── assets/
+│   │   │   ├── images/      # Branding (logo.png)
+│   │   │   └── models/      # GLB Files
+│   │   ├── js/              # Generated client bundles
+│   │   └── styles.css       # Generated Tailwind v4 CSS
+│   ├── views/               # JSX Views & Layouts
+│   └── index.tsx            # Main Server Entry Point
+├── input.css                # Tailwind v4 Configuration
+├── package.json             # Scripts: dev, css, build:client
+└── tsconfig.json            # configured for manual JSX (Classic)
+```
