@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sentinel-bg: #0a0a0a;
+  --color-sentinel-glass: rgba(255, 255, 255, 0.05);
+  --color-sentinel-accent: #ffd700;
+  --color-sentinel-hud: rgba(0, 255, 0, 0.4);
+
+  --font-sans: "Inter", sans-serif;
+}
+
+/* Glassmorphism */
+@utility glass-panel {
+  background: var(--color-sentinel-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

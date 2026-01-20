@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    // Environment setup & latest features
+    "lib": ["ESNext", "DOM"],
+    "target": "esnext",
+    "module": "esnext",
+    "moduleDetection": "force",
+    "jsx": "react",
+    // "jsxImportSource": "@elysiajs/html",
+    "jsxFactory": "Html.createElement",
+    "jsxFragmentFactory": "Html.Fragment",
+    "types": ["bun-types"],
+    // "allowJs": true,
+
+    // Bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "composite": true,
+
+    // Best practices
+    "strict": true,
+    "downlevelIteration": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
+    // Some stricter flags (disabled by default)
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false
+  }
+}
