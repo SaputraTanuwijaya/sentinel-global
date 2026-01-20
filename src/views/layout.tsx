@@ -28,6 +28,9 @@ export const Layout = ({ children }: { children: any }) => {
         <main id="ui-layer" hx-boost="true">
           {children}
         </main>
+
+        {/* Load the bundled 3D Engine */}
+        <script src="/public/js/index.js"></script>
       </body>
     </html>
   );

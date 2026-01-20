@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { html, Html } from "@elysiajs/html"; 
+import { html, Html } from "@elysiajs/html";
 import { staticPlugin } from "@elysiajs/static";
 import { Layout } from "./views/layout";
 
@@ -11,6 +11,14 @@ const app = new Elysia()
     <Layout>
       <div class="flex flex-col items-center justify-center h-full">
         <div class="glass-panel p-8 rounded-lg max-w-2xl text-center">
+          <div class="mb-8 flex justify-center">
+            <img
+              src="/public/assets/images/logo.png"
+              alt="Sentinel Global Logo"
+              class="w-[20vw] h-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+            />
+          </div>
+
           <h1 class="text-4xl font-bold tracking-widest uppercase mb-4 text-white">
             Sentinel Global
           </h1>
@@ -51,5 +59,5 @@ const app = new Elysia()
   .listen(3000);
 
 console.log(
-  `🦊 Sentinel Global is running at ${app.server?.hostname}:${app.server?.port}`,
+  `Sentinel Global is running at ${app.server?.hostname}:${app.server?.port}`,
 );
