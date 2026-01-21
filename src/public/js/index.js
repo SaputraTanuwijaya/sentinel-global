@@ -8865,30 +8865,6 @@ class Loader {
 }
 Loader.DEFAULT_MATERIAL_NAME = "__DEFAULT";
 var _loading = new WeakMap;
-class Light extends Object3D {
-  constructor(color, intensity = 1) {
-    super();
-    this.isLight = true;
-    this.type = "Light";
-    this.color = new Color(color);
-    this.intensity = intensity;
-  }
-  dispose() {
-    this.dispatchEvent({ type: "dispose" });
-  }
-  copy(source, recursive) {
-    super.copy(source, recursive);
-    this.color.copy(source.color);
-    this.intensity = source.intensity;
-    return this;
-  }
-  toJSON(meta) {
-    const data = super.toJSON(meta);
-    data.object.color = this.color.getHex();
-    data.object.intensity = this.intensity;
-    return data;
-  }
-}
 class OrthographicCamera extends Camera {
   constructor(left = -1, right = 1, top = 1, bottom = -1, near = 0.1, far = 2000) {
     super();
@@ -8975,13 +8951,6 @@ class OrthographicCamera extends Camera {
     if (this.view !== null)
       data.object.view = Object.assign({}, this.view);
     return data;
-  }
-}
-class AmbientLight extends Light {
-  constructor(color, intensity) {
-    super(color, intensity);
-    this.isAmbientLight = true;
-    this.type = "AmbientLight";
   }
 }
 var _errorMap = new WeakMap;
@@ -24212,21 +24181,30 @@ class SceneManager {
   camera;
   renderer;
   videoTexture = null;
+  videoElement = null;
+  bgMesh = null;
+  currentTheme = "";
+  VIDEO_MAP = {
+    business_formal: "/public/assets/videos/Business_Formal.mp4",
+    casual_formal: "/public/assets/videos/Business_Formal.mp4",
+    tactical_casual: "/public/assets/videos/Business_Formal.mp4",
+    full_tactical: "/public/assets/videos/Business_Formal.mp4"
+  };
   constructor() {
     this.container = document.getElementById("canvas-container");
     if (!this.container)
       throw new Error("Canvas container not found!");
     this.scene = new Scene;
+    this.scene.background = new Color(657930);
     this.camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 5;
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.container.appendChild(this.renderer.domElement);
-    const ambientLight = new AmbientLight(16777215, 0.5);
-    this.scene.add(ambientLight);
     window.addEventListener("resize", this.onWindowResize.bind(this));
+    this.changeBackground("black");
     this.animate();
     console.log("Sentinel SceneManager: Initialized");
   }
@@ -24243,27 +24221,56 @@ class SceneManager {
   }
   animate() {
     requestAnimationFrame(this.animate.bind(this));
+    if (this.videoTexture)
+      this.videoTexture.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
   }
-  loadVideoBackground(videoUrl) {
-    const video = document.createElement("video");
-    video.src = videoUrl;
-    video.crossOrigin = "anonymous";
-    video.loop = true;
-    video.muted = true;
-    video.play();
-    this.videoTexture = new VideoTexture(video);
+  changeBackground(themeId) {
+    console.log(`Sentinel 3D: Switching to [${themeId}]`);
+    if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
+      if (this.bgMesh)
+        this.bgMesh.visible = false;
+      if (this.videoElement)
+        this.videoElement.pause();
+      this.currentTheme = "black";
+      return;
+    }
+    const videoPath = this.VIDEO_MAP[themeId];
+    if (!this.bgMesh) {
+      this.createVideoPlane(videoPath);
+    } else {
+      this.bgMesh.visible = true;
+    }
+    if (this.videoElement) {
+      if (!this.videoElement.src.includes(videoPath)) {
+        this.videoElement.src = videoPath;
+      }
+      this.videoElement.loop = false;
+      this.videoElement.currentTime = 0;
+      this.videoElement.play();
+    }
+    this.currentTheme = themeId;
+  }
+  createVideoPlane(url) {
+    this.videoElement = document.createElement("video");
+    this.videoElement.src = url;
+    this.videoElement.crossOrigin = "anonymous";
+    this.videoElement.loop = false;
+    this.videoElement.muted = true;
+    this.videoElement.playsInline = true;
+    this.videoElement.play();
+    this.videoTexture = new VideoTexture(this.videoElement);
     this.videoTexture.colorSpace = SRGBColorSpace;
-    const geometry = new PlaneGeometry(20, 12);
+    this.videoTexture.minFilter = LinearFilter;
+    this.videoTexture.magFilter = LinearFilter;
+    const geometry = new PlaneGeometry(32, 18);
     const material = new MeshBasicMaterial({
       map: this.videoTexture,
-      side: DoubleSide,
-      depthTest: false,
-      depthWrite: false
+      side: DoubleSide
     });
-    const bgMesh = new Mesh(geometry, material);
-    bgMesh.position.z = -10;
-    this.scene.add(bgMesh);
+    this.bgMesh = new Mesh(geometry, material);
+    this.bgMesh.position.z = -5;
+    this.scene.add(this.bgMesh);
   }
 }
 
@@ -24271,4 +24278,10 @@ class SceneManager {
 document.addEventListener("DOMContentLoaded", () => {
   const engine = SceneManager.getInstance();
   window.Sentinel = engine;
+  document.body.addEventListener("sentinel-bg-change", (e) => {
+    const theme = e.detail.theme;
+    if (theme) {
+      engine.changeBackground(theme);
+    }
+  });
 });

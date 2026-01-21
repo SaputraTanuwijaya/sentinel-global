@@ -3,7 +3,6 @@ import { Html } from "@elysiajs/html";
 export const Layout = ({ children }: { children: any }) => {
   return (
     <html lang="en">
-      {/* ... rest of your code ... */}
       <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -17,8 +16,8 @@ export const Layout = ({ children }: { children: any }) => {
         <style>
           {`
             body { margin: 0; overflow: hidden; background-color: #0a0a0a; color: white; }
-            #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: all; }
-            #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; width: 100vw; }
+            #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
+            #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; width: 100vw; }  
             #ui-layer > * { pointer-events: auto; }
           `}
         </style>
@@ -29,7 +28,6 @@ export const Layout = ({ children }: { children: any }) => {
           {children}
         </main>
 
-        {/* Load the bundled 3D Engine */}
         <script src="/public/js/index.js"></script>
       </body>
     </html>
