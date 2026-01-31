@@ -24185,10 +24185,10 @@ class SceneManager {
   bgMesh = null;
   currentTheme = "";
   VIDEO_MAP = {
-    business_formal: "/public/assets/videos/Business_Formal.mp4",
-    casual_formal: "/public/assets/videos/Business_Formal.mp4",
-    tactical_casual: "/public/assets/videos/Business_Formal.mp4",
-    full_tactical: "/public/assets/videos/Business_Formal.mp4"
+    business_formal: "/public/assets/videos/business_formal.mp4",
+    casual_formal: "/public/assets/videos/business_casual.mp4",
+    tactical_casual: "/public/assets/videos/tactical_casual.mp4",
+    full_tactical: "/public/assets/videos/full_tactical.mp4"
   };
   constructor() {
     this.container = document.getElementById("canvas-container");
@@ -24197,7 +24197,7 @@ class SceneManager {
     this.scene = new Scene;
     this.scene.background = new Color(657930);
     this.camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.z = 5;
+    this.camera.position.z = 8;
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -24269,7 +24269,7 @@ class SceneManager {
       side: DoubleSide
     });
     this.bgMesh = new Mesh(geometry, material);
-    this.bgMesh.position.z = -5;
+    this.bgMesh.position.set(0, -2, -5);
     this.scene.add(this.bgMesh);
   }
 }

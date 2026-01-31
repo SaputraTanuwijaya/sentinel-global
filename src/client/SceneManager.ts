@@ -14,10 +14,10 @@ export class SceneManager {
   // Configuration: Map IDs to file paths
   // TODO: In the future, add real paths here.
   private readonly VIDEO_MAP: Record<string, string> = {
-    business_formal: "/public/assets/videos/Business_Formal.mp4",
-    casual_formal: "/public/assets/videos/Business_Formal.mp4",
-    tactical_casual: "/public/assets/videos/Business_Formal.mp4",
-    full_tactical: "/public/assets/videos/Business_Formal.mp4",
+    business_formal: "/public/assets/videos/business_formal.mp4",
+    casual_formal: "/public/assets/videos/business_casual.mp4",
+    tactical_casual: "/public/assets/videos/tactical_casual.mp4",
+    full_tactical: "/public/assets/videos/full_tactical.mp4",
   };
 
   private constructor() {
@@ -35,7 +35,7 @@ export class SceneManager {
       0.1,
       1000,
     );
-    this.camera.position.z = 5;
+    this.camera.position.z = 8;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -132,7 +132,7 @@ export class SceneManager {
     });
 
     this.bgMesh = new THREE.Mesh(geometry, material);
-    this.bgMesh.position.z = -5;
+    this.bgMesh.position.set(0, -2, -5);
     // this.bgMesh.name = "BackgroundLayer";
 
     this.scene.add(this.bgMesh);
