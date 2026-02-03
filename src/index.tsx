@@ -3,6 +3,7 @@ import { html, Html } from "@elysiajs/html";
 import { staticPlugin } from "@elysiajs/static";
 import { Layout } from "./views/layout";
 
+import { PrincipalCount } from "./modules/order/views/PrincipalCount";
 import { GuardSelection } from "./modules/order/views/GuardSelection";
 import { DressCode } from "./modules/order/views/DressCode";
 
@@ -45,11 +46,12 @@ const app = new Elysia()
     </Layout>
   ))
 
-  .get("/step/1", () => <GuardSelection />)
-  .get("/step/2", () => <DressCode />)
+  .get("/step/1", () => <PrincipalCount />)
+  .get("/step/2", () => <GuardSelection />)
+  .get("/step/3", () => <DressCode />)
 
-  // --- STEP 3: PLACEHOLDER ---
-  .get("/step/3", () => (
+  // --- STEP 4: PLACEHOLDER ---
+  .get("/step/4", () => (
     <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 text-center animate-fade-in">
       <h1 class="text-4xl text-white font-bold mb-4 font-mono tracking-widest animate-pulse">
         SYSTEM INITIALIZING

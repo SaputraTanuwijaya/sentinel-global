@@ -12,7 +12,7 @@ A high-performance "Bodyguard Ordering" simulation featuring seamless 3D integra
 
 ## 2. Architecture: The Persistent Layout
 
-To achieve the "Wow" factor, we use a Hybrid Rendering approach:
+To ensure the web runs fast a Hybrid Rendering approach is used :
 
 - **The "App Shell" (`src/views/layout.tsx`):**
   - Contains a fixed `#canvas-container` that holds the Three.js scene. This element _never_ reloads.
@@ -48,8 +48,6 @@ sentinel-global/
 
 ### A. The Persistent Layout (Hybrid Rendering)
 
-To achieve the "Wow" factor, we do not reload the page.
-
 1.  **`layout.tsx`** loads the `#canvas-container` (Three.js) once.
 2.  **HTMX** swaps the content inside `#ui-layer` dynamically.
 3.  **Result:** The 3D scene/video background continues playing seamlessly while the UI changes.
@@ -68,9 +66,20 @@ We use Bun's bundler to transpile our 3D logic into a single browser-ready file.
 - **Command:** `bun run build:client`
 - **Output:** `src/public/js/index.js`
 
-## 4. Asset Guidelines (Strict)
+## 4. User Flow (Mission Builder)
 
-To maintain the "Cinematic Infinite Studio" look in Step 2 (Dress Code):
+The application uses a "Single Page Wizard" feel without full reloads:
+
+1.  **Mission Profile:** Select number of Principals (VIPs).
+2.  **Security Tier:** Select capability level (Vanguard, Sentinel, Praetorian).
+3.  **Visuals:** Select attire (Dress Code) with real-time video preview.
+4.  **Motorcade:** _[Coming Soon]_ 3D Vehicle Formation Builder.
+5.  **Mission Parameterr** _[Coming Soon]_ Leaflet Map.
+6.  **Checkout** _[Coming Soon]_ Guest Mode Checkout.
+
+## 5. Asset Guidelines (Strict)
+
+To maintain the "Cinematic Infinite Studio" look in Step 3 (Dress Code):
 
 ### Video Requirements
 
@@ -80,7 +89,7 @@ To maintain the "Cinematic Infinite Studio" look in Step 2 (Dress Code):
 - **Subject:** Centered, illuminated by a spotlight, ensuring the head is not cut off at the top.
 - **Format:** `.mp4` (H.264) or `.webm`.
 
-## 5. Development Workflow
+## 6. Development Workflow
 
 You need **three** terminals running:
 
