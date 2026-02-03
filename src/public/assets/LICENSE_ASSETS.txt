@@ -1,0 +1,23 @@
+ASSET LICENSE NOTICE
+
+Visual assets (3D models, textures, videos, animations)
+in this repository are NOT covered by the MIT License.
+
+Assets are:
+- Derived from public sources
+- AI Generated/Enhancement
+- Modified and optimized for web delivery
+  using Blender, Adobe After Effects, and https://gltf.report
+
+Assets are provided for:
+✔ Demonstration
+✔ Portfolio viewing
+
+❌ Redistribution
+❌ Commercial reuse
+❌ Rehosting or resale
+
+For licensing or commercial use,
+please contact: [saputratanuwijaya@gmail.com / SaputraTanuwijaya]
+
+Asset sources and licenses are respected where applicable.
