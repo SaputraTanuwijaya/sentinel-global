@@ -5,13 +5,24 @@ export const PrincipalCount = () => {
     <div class="flex flex-col items-center justify-end h-full w-full pointer-events-auto bg-transparent animate-fade-in pb-[15vh]">
       {/* Header */}
       <div class="absolute top-12 w-full text-center z-10">
-        <h2 class="text-4xl text-white font-bold tracking-[0.3em] mb-4 drop-shadow-2xl font-mono uppercase">
+        <h2 class="text-4xl text-white font-bold tracking-[0.3em] mb-4 drop-shadow-2xl font-mono uppercase flex items-center justify-center gap-3">
           Mission Profile
         </h2>
+
         <div class="h-px w-32 bg-white/50 mx-auto"></div>
-        <p class="text-gray-300 font-light tracking-widest text-sm mt-4 uppercase">
-          Identify Principals for Protection
-        </p>
+
+        <div class="flex items-center justify-center gap-2 mt-4">
+          <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
+            Identify Principals
+          </span>
+          <Tooltip
+            term=""
+            desc="High-value individuals requiring direct escort and protection during the mission."
+          />
+          <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
+            for Protection
+          </span>
+        </div>
       </div>
 
       <div class="flex items-center gap-20 z-10">
@@ -24,10 +35,7 @@ export const PrincipalCount = () => {
         </button>
 
         <div class="flex flex-col items-center justify-center w-48">
-          {/* Transparent Placeholder - Purely for spacing/clicking if needed */}
-          <div class="mb-2 h-24 w-24 flex items-center justify-center opacity-0 pointer-events-none">
-            {/* Invisible spacer for 3D model */}
-          </div>
+          <div class="mb-2 h-24 w-24 flex items-center justify-center opacity-0 pointer-events-none"></div>
 
           {/* Number Display */}
           <div
@@ -36,9 +44,16 @@ export const PrincipalCount = () => {
           >
             1
           </div>
-          <span class="text-white text-xs tracking-[0.4em] font-bold uppercase mt-4 border-t border-white/30 pt-2">
-            Active Units
-          </span>
+
+          <div class="flex items-center gap-2 mt-4 border-t border-white/30 pt-2">
+            <span class="text-white text-xs tracking-[0.4em] font-bold uppercase">
+              Principals
+            </span>
+            <Tooltip
+              term=""
+              desc="High-value individuals requiring direct escort and protection during the mission."
+            />
+          </div>
         </div>
 
         {/* Increment */}
@@ -93,5 +108,20 @@ export const PrincipalCount = () => {
       `}
       </style>
     </div>
+  );
+};
+
+const Tooltip = ({ term, desc }: { term: string; desc: string }) => {
+  return (
+    <span class="relative group/tooltip cursor-help inline-flex items-center gap-1 hover:text-white transition-colors">
+      {term}
+      <span class="text-xs text-gray-500 group-hover/tooltip:text-white transition-colors border border-gray-600 rounded-full w-4 h-4 flex items-center justify-center">
+        ?
+      </span>
+      <span class="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 bg-black border border-white/20 rounded-lg text-xs text-gray-200 shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50 pointer-events-none text-center backdrop-blur-md">
+        {desc}
+        <span class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-white/20"></span>
+      </span>
+    </span>
   );
 };

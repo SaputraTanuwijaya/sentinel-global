@@ -29482,23 +29482,23 @@ class SceneManager {
     if (count === 1) {
       offsets.push(new Vector3(0, 0, 0));
     } else if (count === 2) {
-      offsets.push(new Vector3(-spacing / 2, 0, 0));
-      offsets.push(new Vector3(spacing / 2, 0, 0));
+      offsets.push(new Vector3(0, 0, -spacing / 2));
+      offsets.push(new Vector3(0, 0, spacing / 2));
     } else if (count === 3) {
-      offsets.push(new Vector3(0, 0, 0));
-      offsets.push(new Vector3(spacing, 0, -spacing / 2));
-      offsets.push(new Vector3(spacing, 0, spacing / 2));
+      offsets.push(new Vector3(-spacing, 0, 0));
+      offsets.push(new Vector3(0, 0, -spacing));
+      offsets.push(new Vector3(0, 0, spacing));
     } else if (count === 4) {
       offsets.push(new Vector3(-spacing / 2, 0, -spacing / 2));
-      offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
       offsets.push(new Vector3(-spacing / 2, 0, spacing / 2));
+      offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
       offsets.push(new Vector3(spacing / 2, 0, spacing / 2));
     } else {
-      offsets.push(new Vector3(-spacing, 0, -spacing / 2));
+      offsets.push(new Vector3(-spacing, 0, -spacing));
+      offsets.push(new Vector3(-spacing, 0, 0));
+      offsets.push(new Vector3(-spacing, 0, spacing));
       offsets.push(new Vector3(0, 0, -spacing / 2));
-      offsets.push(new Vector3(spacing, 0, -spacing / 2));
-      offsets.push(new Vector3(-spacing / 2, 0, spacing / 2));
-      offsets.push(new Vector3(spacing / 2, 0, spacing / 2));
+      offsets.push(new Vector3(0, 0, spacing / 2));
     }
     this.targetPositions = offsets;
   }

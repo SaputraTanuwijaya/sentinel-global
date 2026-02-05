@@ -157,35 +157,33 @@ export class SceneManager {
     const spacing = 1.2;
     let offsets: THREE.Vector3[] = [];
 
-    // 1 Person: Center
     if (count === 1) {
       offsets.push(new THREE.Vector3(0, 0, 0));
-
-      // 2 People: Side by Side
     } else if (count === 2) {
-      offsets.push(new THREE.Vector3(-spacing / 2, 0, 0));
-      offsets.push(new THREE.Vector3(spacing / 2, 0, 0));
-
-      // 3 People: Wedge
+      // Side by Side
+      offsets.push(new THREE.Vector3(0, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(0, 0, spacing / 2));
     } else if (count === 3) {
-      offsets.push(new THREE.Vector3(0, 0, 0));
-      offsets.push(new THREE.Vector3(spacing, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(spacing, 0, spacing / 2));
+      // Wedge (1 Front, 2 Back)
+      offsets.push(new THREE.Vector3(-spacing, 0, 0));
+      offsets.push(new THREE.Vector3(0, 0, -spacing));
+      offsets.push(new THREE.Vector3(0, 0, spacing));
     } else if (count === 4) {
-      // Square - Centered
+      // Square
       offsets.push(new THREE.Vector3(-spacing / 2, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2));
       offsets.push(new THREE.Vector3(-spacing / 2, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2));
       offsets.push(new THREE.Vector3(spacing / 2, 0, spacing / 2));
     } else {
-      // 5+ Triangle (Wedge)
-      offsets.push(new THREE.Vector3(-spacing, 0, -spacing / 2));
+      // 5+ Phalanx (3 Front, 2 Back)
+      offsets.push(new THREE.Vector3(-spacing, 0, -spacing));
+      offsets.push(new THREE.Vector3(-spacing, 0, 0));
+      offsets.push(new THREE.Vector3(-spacing, 0, spacing));
+
       offsets.push(new THREE.Vector3(0, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(spacing, 0, -spacing / 2));
-      // 2 In the back
-      offsets.push(new THREE.Vector3(-spacing / 2, 0, spacing / 2));
-      offsets.push(new THREE.Vector3(spacing / 2, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(0, 0, spacing / 2));
     }
+
     this.targetPositions = offsets;
   }
 
