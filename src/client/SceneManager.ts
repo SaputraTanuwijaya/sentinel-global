@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 
 export class SceneManager {
   private static instance: SceneManager;
@@ -12,7 +14,6 @@ export class SceneManager {
   private currentTheme: string = "";
 
   // Configuration: Map IDs to file paths
-  // TODO: In the future, add real paths here.
   private readonly VIDEO_MAP: Record<string, string> = {
     business_formal: "/public/assets/videos/business_formal.mp4",
     casual_formal: "/public/assets/videos/business_casual.mp4",
@@ -20,14 +21,20 @@ export class SceneManager {
     full_tactical: "/public/assets/videos/full_tactical.mp4",
   };
 
+  // 3D Formation Props
+  private principalModel: THREE.Group | null = null;
+  private principalInstances: THREE.Group[] = [];
+  private formationGroup: THREE.Group;
+  private gltfloader: GLTFLoader;
+  private targetPositions: THREE.Vector3[] = [];
+
   private constructor() {
     this.container = document.getElementById("canvas-container") as HTMLElement;
     if (!this.container) throw new Error("Canvas container not found!");
 
     this.scene = new THREE.Scene();
 
-    // Defaulted screen background as black
-    this.scene.background = new THREE.Color(0x0a0a0a);
+    this.scene.background = new THREE.Color(0x050505);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -41,16 +48,40 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
     // const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     // this.scene.add(ambientLight);
 
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    this.scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
+    dirLight.position.set(5, 10, 7);
+    dirLight.castShadow = true;
+    this.scene.add(dirLight);
+    const rimLight = new THREE.SpotLight(0xffffff, 4.0);
+    rimLight.position.set(-5, 5, -5);
+    rimLight.lookAt(0, 0, 0);
+    this.scene.add(rimLight);
+
+    // Group Formation
+    this.formationGroup = new THREE.Group();
+    this.scene.add(this.formationGroup);
+
+    // Loaders
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath("/public/js/libs/draco/");
+    this.gltfloader = new GLTFLoader();
+    this.gltfloader.setDRACOLoader(dracoLoader);
+
+    this.preloadPrincipal();
+
     window.addEventListener("resize", this.onWindowResize.bind(this));
-
-    this.changeBackground("black");
-
+    // this.changeBackground("black");
     this.animate();
+
+    (window as any).Sentinel = this;
 
     console.log("Sentinel SceneManager: Initialized");
   }
@@ -62,6 +93,122 @@ export class SceneManager {
     return SceneManager.instance;
   }
 
+  private preloadPrincipal() {
+    this.gltfloader.load(
+      "/public/assets/models/Principal-v1.glb",
+      (gltf) => {
+        this.principalModel = gltf.scene;
+        this.principalModel.traverse((node) => {
+          if ((node as THREE.Mesh).isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+
+        this.principalModel.scale.set(1.5, 1.5, 1.5);
+        this.principalModel.visible = false;
+        this.scene.add(this.principalModel);
+        console.log("Sentinel: Principal Model Loaded");
+      },
+      undefined,
+      (error) => console.error("Error loading principal:", error),
+    );
+  }
+
+  public updatePrincipals(count: number) {
+    console.log(`Sentinel: Updating Formation to ${count}`);
+
+    this.camera.position.set(4, 5, 4);
+    this.camera.lookAt(0, 0.5, 0);
+
+    if (this.bgMesh) this.bgMesh.visible = false;
+    if (this.videoElement) this.videoElement.pause();
+    this.formationGroup.visible = true;
+
+    if (!this.principalModel) {
+      console.warn("Principal model not loaded yet.");
+      return;
+    }
+
+    while (this.principalInstances.length < count) {
+      const clone = this.principalModel.clone();
+      clone.visible = true;
+      clone.position.set(0, 0, 0);
+      clone.scale.set(0, 0, 0);
+      this.formationGroup.add(clone);
+      this.principalInstances.push(clone);
+      this.targetPositions.push(new THREE.Vector3(0, 0, 0));
+    }
+
+    while (this.principalInstances.length > count) {
+      const removed = this.principalInstances.pop();
+      this.targetPositions.pop();
+      if (removed) this.formationGroup.remove(removed);
+    }
+
+    // this.principalInstances.forEach((model, index) => {
+    //   const targetPos = this.getFormationOffset(index, count);
+
+    //   // TODO : Upgrade slide animations or choose to instantly position
+    //   model.position.copy(targetPos);
+    //   model.lookAt(0, 0, 10);
+    // });
+
+    const spacing = 1.2;
+    let offsets: THREE.Vector3[] = [];
+
+    // 1 Person: Center
+    if (count === 1) {
+      offsets.push(new THREE.Vector3(0, 0, 0));
+
+      // 2 People: Side by Side
+    } else if (count === 2) {
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, 0));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, 0));
+
+      // 3 People: Wedge
+    } else if (count === 3) {
+      offsets.push(new THREE.Vector3(0, 0, 0));
+      offsets.push(new THREE.Vector3(spacing, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(spacing, 0, spacing / 2));
+    } else if (count === 4) {
+      // Square - Centered
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, spacing / 2));
+    } else {
+      // 5+ Triangle (Wedge)
+      offsets.push(new THREE.Vector3(-spacing, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(0, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(spacing, 0, -spacing / 2));
+      // 2 In the back
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, spacing / 2));
+    }
+    this.targetPositions = offsets;
+  }
+
+  // private getFormationOffset(index: number, total: number): THREE.Vector3 {
+  //   const spacing = 1.0;
+
+  //   // 1 Person: Center
+  //   if (total === 1) return new THREE.Vector3(0, 0, 0);
+
+  //   // 2 People: Side by Side
+  //   if (total === 2) {
+  //     return new THREE.Vector3((index === 0 ? -0.5 : 0.5) * spacing, 0, 0);
+  //   }
+
+  //   // 3+ People: Wedge (Triangle)
+  //   if (index === 0) return new THREE.Vector3(0, 0, 0);
+
+  //   const row = Math.floor((index + 1) / 2);
+  //   const side = index % 2 === 0 ? 1 : -1;
+
+  //   return new THREE.Vector3(side * spacing * row, 0, -spacing * row);
+  // }
+
   private onWindowResize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
@@ -71,9 +218,20 @@ export class SceneManager {
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this));
 
-    // Future: Update animations here
-    if (this.videoTexture) this.videoTexture.needsUpdate = true;
+    // Put animation here:
+    if (this.formationGroup.visible) {
+      this.principalInstances.forEach((model, index) => {
+        const target = this.targetPositions[index];
+        if (!target) return;
+        // Lerp sliding
+        model.position.lerp(target, 0.1);
+        // Pop effect for new clone
+        model.scale.lerp(new THREE.Vector3(1.5, 1.5, 1.5), 0.2);
+        model.lookAt(-10, 0, 0);
+      });
+    }
 
+    if (this.videoTexture) this.videoTexture.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -83,6 +241,14 @@ export class SceneManager {
 
     // Debug theme
     console.log(`Sentinel 3D: Switching to [${themeId}]`);
+
+    if (themeId !== "black") {
+      this.camera.position.set(0, 0, 8);
+      this.camera.lookAt(0, 0, 0);
+      this.formationGroup.visible = false;
+    } else {
+      this.formationGroup.visible = true;
+    }
 
     if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
       if (this.bgMesh) this.bgMesh.visible = false;
@@ -108,7 +274,7 @@ export class SceneManager {
       this.videoElement.currentTime = 0;
       this.videoElement.play();
     }
-    this.currentTheme = themeId;
+    // this.currentTheme = themeId;
   }
 
   private createVideoPlane(url: string): void {
