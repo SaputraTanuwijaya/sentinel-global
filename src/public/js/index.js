@@ -29465,11 +29465,11 @@ class SceneManager {
     while (this.principalInstances.length < count) {
       const clone = this.principalModel.clone();
       clone.visible = true;
-      clone.position.set(0, 0, 0);
+      clone.position.set(1, 0, 0);
       clone.scale.set(0, 0, 0);
       this.formationGroup.add(clone);
       this.principalInstances.push(clone);
-      this.targetPositions.push(new Vector3(0, 0, 0));
+      this.targetPositions.push(new Vector3(1, 0, 0));
     }
     while (this.principalInstances.length > count) {
       const removed = this.principalInstances.pop();
@@ -29485,22 +29485,49 @@ class SceneManager {
       offsets.push(new Vector3(0, 0, -spacing / 2));
       offsets.push(new Vector3(0, 0, spacing / 2));
     } else if (count === 3) {
+      offsets.push(new Vector3(0, 0, spacing / 2));
+      offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
+      offsets.push(new Vector3(-spacing / 2, 0, -spacing / 2));
+    } else if (count === 4) {
       offsets.push(new Vector3(-spacing, 0, 0));
       offsets.push(new Vector3(0, 0, -spacing));
       offsets.push(new Vector3(0, 0, spacing));
-    } else if (count === 4) {
-      offsets.push(new Vector3(-spacing / 2, 0, -spacing / 2));
-      offsets.push(new Vector3(-spacing / 2, 0, spacing / 2));
-      offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
-      offsets.push(new Vector3(spacing / 2, 0, spacing / 2));
+      offsets.push(new Vector3(spacing, 0, 0));
     } else {
-      offsets.push(new Vector3(-spacing, 0, -spacing));
+      offsets.push(new Vector3(0, 0, 0));
       offsets.push(new Vector3(-spacing, 0, 0));
-      offsets.push(new Vector3(-spacing, 0, spacing));
-      offsets.push(new Vector3(0, 0, -spacing / 2));
-      offsets.push(new Vector3(0, 0, spacing / 2));
+      offsets.push(new Vector3(spacing, 0, 0));
+      offsets.push(new Vector3(0, 0, -spacing));
+      offsets.push(new Vector3(0, 0, spacing));
     }
-    this.targetPositions = offsets;
+    const unassignedSlots = [...offsets];
+    const availableInstances = this.principalInstances.map((inst, i) => ({
+      id: i,
+      pos: inst.position
+    }));
+    this.targetPositions = new Array(count).fill(null);
+    unassignedSlots.forEach((slot) => {
+      let closestIdx = -1;
+      let minDst = Infinity;
+      availableInstances.forEach((inst, idx) => {
+        const dst = inst.pos.distanceTo(slot);
+        if (dst < minDst) {
+          minDst = dst;
+          closestIdx = idx;
+        }
+      });
+      if (closestIdx !== -1) {
+        const foundInstance = availableInstances[closestIdx];
+        if (foundInstance) {
+          this.targetPositions[foundInstance.id] = slot;
+          availableInstances.splice(closestIdx, 1);
+        }
+      }
+    });
+    this.targetPositions.forEach((pos, i) => {
+      if (!pos && offsets[i])
+        this.targetPositions[i] = offsets[i];
+    });
   }
   onWindowResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -29514,8 +29541,8 @@ class SceneManager {
         const target = this.targetPositions[index];
         if (!target)
           return;
-        model.position.lerp(target, 0.1);
-        model.scale.lerp(new Vector3(1.5, 1.5, 1.5), 0.2);
+        model.position.lerp(target, 0.08);
+        model.scale.lerp(new Vector3(1.5, 1.5, 1.5), 0.1);
         model.lookAt(-10, 0, 0);
       });
     }

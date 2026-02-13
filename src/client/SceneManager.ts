@@ -133,11 +133,12 @@ export class SceneManager {
     while (this.principalInstances.length < count) {
       const clone = this.principalModel.clone();
       clone.visible = true;
-      clone.position.set(0, 0, 0);
+      clone.position.set(1, 0, 0);
       clone.scale.set(0, 0, 0);
+
       this.formationGroup.add(clone);
       this.principalInstances.push(clone);
-      this.targetPositions.push(new THREE.Vector3(0, 0, 0));
+      this.targetPositions.push(new THREE.Vector3(1, 0, 0));
     }
 
     while (this.principalInstances.length > count) {
@@ -164,27 +165,59 @@ export class SceneManager {
       offsets.push(new THREE.Vector3(0, 0, -spacing / 2));
       offsets.push(new THREE.Vector3(0, 0, spacing / 2));
     } else if (count === 3) {
-      // Wedge (1 Front, 2 Back)
+      // Triable / Wedge
+      offsets.push(new THREE.Vector3(0, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2));
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, -spacing / 2));
+    } else if (count === 4) {
+      // Diamond
       offsets.push(new THREE.Vector3(-spacing, 0, 0));
       offsets.push(new THREE.Vector3(0, 0, -spacing));
       offsets.push(new THREE.Vector3(0, 0, spacing));
-    } else if (count === 4) {
-      // Square
-      offsets.push(new THREE.Vector3(-spacing / 2, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(-spacing / 2, 0, spacing / 2));
-      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(spacing / 2, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing, 0, 0));
     } else {
-      // 5+ Phalanx (3 Front, 2 Back)
-      offsets.push(new THREE.Vector3(-spacing, 0, -spacing));
+      // 5+ Phalanx
+      offsets.push(new THREE.Vector3(0, 0, 0));
       offsets.push(new THREE.Vector3(-spacing, 0, 0));
-      offsets.push(new THREE.Vector3(-spacing, 0, spacing));
-
-      offsets.push(new THREE.Vector3(0, 0, -spacing / 2));
-      offsets.push(new THREE.Vector3(0, 0, spacing / 2));
+      offsets.push(new THREE.Vector3(spacing, 0, 0));
+      offsets.push(new THREE.Vector3(0, 0, -spacing));
+      offsets.push(new THREE.Vector3(0, 0, spacing));
     }
 
-    this.targetPositions = offsets;
+    const unassignedSlots = [...offsets];
+
+    const availableInstances = this.principalInstances.map((inst, i) => ({
+      id: i,
+      pos: inst.position,
+    }));
+
+    // this.targetPositions = offsets;
+    this.targetPositions = new Array(count).fill(null);
+
+    unassignedSlots.forEach((slot) => {
+      let closestIdx = -1;
+      let minDst = Infinity;
+
+      availableInstances.forEach((inst, idx) => {
+        const dst = inst.pos.distanceTo(slot);
+        if (dst < minDst) {
+          minDst = dst;
+          closestIdx = idx;
+        }
+      });
+
+      if (closestIdx !== -1) {
+        const foundInstance = availableInstances[closestIdx];
+        if (foundInstance) {
+          this.targetPositions[foundInstance.id] = slot;
+          availableInstances.splice(closestIdx, 1);
+        }
+      }
+    });
+
+    this.targetPositions.forEach((pos, i) => {
+      if (!pos && offsets[i]) this.targetPositions[i] = offsets[i];
+    });
   }
 
   // private getFormationOffset(index: number, total: number): THREE.Vector3 {
@@ -222,9 +255,9 @@ export class SceneManager {
         const target = this.targetPositions[index];
         if (!target) return;
         // Lerp sliding
-        model.position.lerp(target, 0.1);
+        model.position.lerp(target, 0.08);
         // Pop effect for new clone
-        model.scale.lerp(new THREE.Vector3(1.5, 1.5, 1.5), 0.2);
+        model.scale.lerp(new THREE.Vector3(1.5, 1.5, 1.5), 0.1);
         model.lookAt(-10, 0, 0);
       });
     }
