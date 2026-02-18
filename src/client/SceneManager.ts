@@ -28,6 +28,28 @@ export class SceneManager {
   private gltfloader: GLTFLoader;
   private targetPositions: THREE.Vector3[] = [];
 
+  // 3D Motorcade Props
+  private slotGroup: THREE.Group = new THREE.Group();
+  private loadedVehicles: Map<number, THREE.Group> = new Map();
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+
+  private readonly TIER_CONFIG: Record<string, any[]> = {
+    Vanguard: [{ id: 0, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 }],
+    Sentinel: [
+      { id: 0, role: "LEAD", x: 0, z: -8, color: 0x00ff00 },
+      { id: 1, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
+      { id: 2, role: "REAR", x: 0, z: 8, color: 0x00ff00 },
+    ],
+    Praetorian: [
+      { id: 0, role: "SWEEPER", x: 0, z: -14, color: 0x00ffff },
+      { id: 1, role: "LEAD", x: 0, z: -7, color: 0x00ff00 },
+      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
+      { id: 3, role: "CAT", x: 0, z: 7, color: 0xff0000 },
+      { id: 4, role: "ECM", x: 0, z: 14, color: 0x0000ff },
+    ],
+  };
+
   private constructor() {
     this.container = document.getElementById("canvas-container") as HTMLElement;
     if (!this.container) throw new Error("Canvas container not found!");
@@ -105,7 +127,7 @@ export class SceneManager {
           }
         });
 
-        this.principalModel.scale.set(1.5, 1.5, 1.5);
+        this.principalModel.scale.set(1, 1, 1);
         this.principalModel.visible = false;
         this.scene.add(this.principalModel);
         console.log("Sentinel: Principal Model Loaded");
@@ -120,10 +142,10 @@ export class SceneManager {
 
     this.camera.position.set(4, 5, 4);
     this.camera.lookAt(0, 0.5, 0);
-
     if (this.bgMesh) this.bgMesh.visible = false;
     if (this.videoElement) this.videoElement.pause();
     this.formationGroup.visible = true;
+    this.slotGroup.visible = false;
 
     if (!this.principalModel) {
       console.warn("Principal model not loaded yet.");
@@ -333,5 +355,141 @@ export class SceneManager {
     // this.bgMesh.name = "BackgroundLayer";
 
     this.scene.add(this.bgMesh);
+  }
+
+  public initMotorcadeMode(tier: string = "Vanguard") {
+    console.log(`Sentinel: Initializing Motorcade for [${tier}]`);
+
+    // --- NUCLEAR CLEANUP ---
+    if (this.bgMesh) {
+      this.bgMesh.visible = false;
+      this.scene.remove(this.bgMesh);
+    }
+    if (this.videoElement) {
+      this.videoElement.pause();
+    }
+
+    this.formationGroup.visible = false;
+    this.principalInstances.forEach((p) => {
+      p.visible = false;
+    });
+
+    // Reset Camera
+    this.camera.position.set(15, 12, 15);
+    this.camera.lookAt(0, 0, 0);
+    // -----------------------
+
+    this.slotGroup.clear();
+    this.scene.add(this.slotGroup);
+
+    const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+
+    if (!config) return;
+    config.forEach((slotData) => {
+      this.createHolographicSlot(slotData);
+    });
+
+    window.addEventListener("click", this.onMouseClick.bind(this));
+    this.slotGroup.visible = true;
+  }
+
+  private createHolographicSlot(data: any) {
+    // Glowing Floor Box
+    const geometry = new THREE.BoxGeometry(3.5, 0.1, 6);
+    const material = new THREE.MeshBasicMaterial({
+      color: data.color,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.5,
+    });
+
+    const slot = new THREE.Mesh(geometry, material);
+    slot.position.set(data.x, 0, data.z);
+    slot.userData = { id: data.id, role: data.role, type: "slot" };
+
+    // Anchor
+    const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 2);
+    const poleMat = new THREE.MeshBasicMaterial({ color: data.color });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 1;
+    slot.add(pole);
+
+    this.slotGroup.add(slot);
+  }
+
+  private onMouseClick(event: MouseEvent) {
+    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Raycast
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(
+      this.slotGroup.children,
+      false,
+    );
+
+    if (intersects.length > 0) {
+      // Since type could be undefined maybe use optional chaining and add (?) behind array and userData
+      const userData = intersects[0]?.object.userData;
+      if (userData?.type === "slot") {
+        console.log(`Sentinel: Clicked Slot ${userData.role}`);
+
+        document.body.dispatchEvent(
+          new CustomEvent("sentinel-garage-open", {
+            detail: { slotId: userData.id, role: userData.role },
+          }),
+        );
+      }
+    }
+  }
+
+  public spawnVehicle(slotId: number, vehicleType: string) {
+    // Find the slot position
+    const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
+    if (!slot) return;
+
+    // Remove existing vehicle in this slot if any
+    if (this.loadedVehicles.has(slotId)) {
+      const old = this.loadedVehicles.get(slotId);
+      if (old) this.scene.remove(old);
+    }
+
+    // Map vehicleType to GLB Path
+    const modelMap: Record<string, string> = {
+      Escalade: "/public/assets/models/CadillacEscalade_Optimized-v1.glb",
+      G63: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
+      Suburban: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
+      F150: "/public/assets/models/FordF150_Optimized-v3.glb",
+      BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb",
+    };
+
+    const path = modelMap[vehicleType];
+    if (!path) return;
+
+    this.gltfloader.load(path, (gltf) => {
+      const vehicle = gltf.scene;
+      vehicle.position.copy(slot.position);
+
+      // Rotation
+      vehicle.rotation.y = Math.PI; // Face forward
+      // Scale Consistency
+      vehicle.scale.set(1, 1, 1);
+      // Animate In
+      vehicle.position.y = 5;
+      const targetY = 0;
+
+      this.scene.add(vehicle);
+      this.loadedVehicles.set(slotId, vehicle);
+
+      const drop = () => {
+        if (vehicle.position.y > targetY) {
+          vehicle.position.y -= 0.2;
+          requestAnimationFrame(drop);
+        } else {
+          vehicle.position.y = targetY;
+        }
+      };
+      drop();
+    });
   }
 }

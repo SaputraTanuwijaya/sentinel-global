@@ -122,8 +122,8 @@ export const DressCode = () => {
             </div>
 
             <button
-              class="w-full py-2.5 bg-white text-black font-bold uppercase tracking-widest rounded-full hover:bg-gray-300 transition-all shadow-lg text-sm"
-              hx-get="/step/3"
+              class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+              hx-get="/step/4"
               hx-target="#ui-layer"
             >
               Confirm Selection

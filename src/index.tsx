@@ -6,6 +6,7 @@ import { Layout } from "./views/layout";
 import { PrincipalCount } from "./modules/order/views/PrincipalCount";
 import { GuardSelection } from "./modules/order/views/GuardSelection";
 import { DressCode } from "./modules/order/views/DressCode";
+import { Motorcade } from "./modules/order/views/Motorcade";
 
 const app = new Elysia()
   .use(html())
@@ -49,15 +50,16 @@ const app = new Elysia()
   .get("/step/1", () => <PrincipalCount />)
   .get("/step/2", () => <GuardSelection />)
   .get("/step/3", () => <DressCode />)
+  .get("/step/4", () => <Motorcade />)
 
   // --- STEP 4: PLACEHOLDER ---
-  .get("/step/4", () => (
+  .get("/step/5", () => (
     <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 text-center animate-fade-in">
       <h1 class="text-4xl text-white font-bold mb-4 font-mono tracking-widest animate-pulse">
         SYSTEM INITIALIZING
       </h1>
       <p class="text-sentinel-hud mb-8 font-mono">
-        Loading Motorcade Configuration...
+        Loading Map Configuration...
       </p>
 
       <div class="w-64 h-1 bg-gray-800 rounded-full overflow-hidden">

@@ -9310,6 +9310,138 @@ class ExternalTexture extends Texture {
     return this;
   }
 }
+class CylinderGeometry extends BufferGeometry {
+  constructor(radiusTop = 1, radiusBottom = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+    super();
+    this.type = "CylinderGeometry";
+    this.parameters = {
+      radiusTop,
+      radiusBottom,
+      height,
+      radialSegments,
+      heightSegments,
+      openEnded,
+      thetaStart,
+      thetaLength
+    };
+    const scope = this;
+    radialSegments = Math.floor(radialSegments);
+    heightSegments = Math.floor(heightSegments);
+    const indices = [];
+    const vertices = [];
+    const normals = [];
+    const uvs = [];
+    let index = 0;
+    const indexArray = [];
+    const halfHeight = height / 2;
+    let groupStart = 0;
+    generateTorso();
+    if (openEnded === false) {
+      if (radiusTop > 0)
+        generateCap(true);
+      if (radiusBottom > 0)
+        generateCap(false);
+    }
+    this.setIndex(indices);
+    this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+    this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+    this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+    function generateTorso() {
+      const normal = new Vector3;
+      const vertex = new Vector3;
+      let groupCount = 0;
+      const slope = (radiusBottom - radiusTop) / height;
+      for (let y = 0;y <= heightSegments; y++) {
+        const indexRow = [];
+        const v = y / heightSegments;
+        const radius = v * (radiusBottom - radiusTop) + radiusTop;
+        for (let x = 0;x <= radialSegments; x++) {
+          const u = x / radialSegments;
+          const theta = u * thetaLength + thetaStart;
+          const sinTheta = Math.sin(theta);
+          const cosTheta = Math.cos(theta);
+          vertex.x = radius * sinTheta;
+          vertex.y = -v * height + halfHeight;
+          vertex.z = radius * cosTheta;
+          vertices.push(vertex.x, vertex.y, vertex.z);
+          normal.set(sinTheta, slope, cosTheta).normalize();
+          normals.push(normal.x, normal.y, normal.z);
+          uvs.push(u, 1 - v);
+          indexRow.push(index++);
+        }
+        indexArray.push(indexRow);
+      }
+      for (let x = 0;x < radialSegments; x++) {
+        for (let y = 0;y < heightSegments; y++) {
+          const a = indexArray[y][x];
+          const b = indexArray[y + 1][x];
+          const c = indexArray[y + 1][x + 1];
+          const d = indexArray[y][x + 1];
+          if (radiusTop > 0 || y !== 0) {
+            indices.push(a, b, d);
+            groupCount += 3;
+          }
+          if (radiusBottom > 0 || y !== heightSegments - 1) {
+            indices.push(b, c, d);
+            groupCount += 3;
+          }
+        }
+      }
+      scope.addGroup(groupStart, groupCount, 0);
+      groupStart += groupCount;
+    }
+    function generateCap(top) {
+      const centerIndexStart = index;
+      const uv = new Vector2;
+      const vertex = new Vector3;
+      let groupCount = 0;
+      const radius = top === true ? radiusTop : radiusBottom;
+      const sign = top === true ? 1 : -1;
+      for (let x = 1;x <= radialSegments; x++) {
+        vertices.push(0, halfHeight * sign, 0);
+        normals.push(0, sign, 0);
+        uvs.push(0.5, 0.5);
+        index++;
+      }
+      const centerIndexEnd = index;
+      for (let x = 0;x <= radialSegments; x++) {
+        const u = x / radialSegments;
+        const theta = u * thetaLength + thetaStart;
+        const cosTheta = Math.cos(theta);
+        const sinTheta = Math.sin(theta);
+        vertex.x = radius * sinTheta;
+        vertex.y = halfHeight * sign;
+        vertex.z = radius * cosTheta;
+        vertices.push(vertex.x, vertex.y, vertex.z);
+        normals.push(0, sign, 0);
+        uv.x = cosTheta * 0.5 + 0.5;
+        uv.y = sinTheta * 0.5 * sign + 0.5;
+        uvs.push(uv.x, uv.y);
+        index++;
+      }
+      for (let x = 0;x < radialSegments; x++) {
+        const c = centerIndexStart + x;
+        const i = centerIndexEnd + x;
+        if (top === true) {
+          indices.push(i, i + 1, c);
+        } else {
+          indices.push(i + 1, i, c);
+        }
+        groupCount += 3;
+      }
+      scope.addGroup(groupStart, groupCount, top === true ? 1 : 2);
+      groupStart += groupCount;
+    }
+  }
+  copy(source) {
+    super.copy(source);
+    this.parameters = Object.assign({}, source.parameters);
+    return this;
+  }
+  static fromJSON(data) {
+    return new CylinderGeometry(data.radiusTop, data.radiusBottom, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
+  }
+}
 class PlaneGeometry extends BufferGeometry {
   constructor(width = 1, height = 1, widthSegments = 1, heightSegments = 1) {
     super();
@@ -11675,6 +11807,75 @@ PropertyBinding.prototype.SetterByBindingTypeAndVersioning = [
   ]
 ];
 var _controlInterpolantsResultBuffer = new Float32Array(1);
+var _matrix = /* @__PURE__ */ new Matrix4;
+
+class Raycaster {
+  constructor(origin, direction, near = 0, far = Infinity) {
+    this.ray = new Ray(origin, direction);
+    this.near = near;
+    this.far = far;
+    this.camera = null;
+    this.layers = new Layers;
+    this.params = {
+      Mesh: {},
+      Line: { threshold: 1 },
+      LOD: {},
+      Points: { threshold: 1 },
+      Sprite: {}
+    };
+  }
+  set(origin, direction) {
+    this.ray.set(origin, direction);
+  }
+  setFromCamera(coords, camera) {
+    if (camera.isPerspectiveCamera) {
+      this.ray.origin.setFromMatrixPosition(camera.matrixWorld);
+      this.ray.direction.set(coords.x, coords.y, 0.5).unproject(camera).sub(this.ray.origin).normalize();
+      this.camera = camera;
+    } else if (camera.isOrthographicCamera) {
+      this.ray.origin.set(coords.x, coords.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera);
+      this.ray.direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+      this.camera = camera;
+    } else {
+      error("Raycaster: Unsupported camera type: " + camera.type);
+    }
+  }
+  setFromXRController(controller) {
+    _matrix.identity().extractRotation(controller.matrixWorld);
+    this.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    this.ray.direction.set(0, 0, -1).applyMatrix4(_matrix);
+    return this;
+  }
+  intersectObject(object, recursive = true, intersects = []) {
+    intersect(object, this, intersects, recursive);
+    intersects.sort(ascSort);
+    return intersects;
+  }
+  intersectObjects(objects, recursive = true, intersects = []) {
+    for (let i = 0, l = objects.length;i < l; i++) {
+      intersect(objects[i], this, intersects, recursive);
+    }
+    intersects.sort(ascSort);
+    return intersects;
+  }
+}
+function ascSort(a, b) {
+  return a.distance - b.distance;
+}
+function intersect(object, raycaster, intersects, recursive) {
+  let propagate = true;
+  if (object.layers.test(raycaster.layers)) {
+    const result = object.raycast(raycaster, intersects);
+    if (result === false)
+      propagate = false;
+  }
+  if (propagate === true && recursive === true) {
+    const children = object.children;
+    for (let i = 0, l = children.length;i < l; i++) {
+      intersect(children[i], raycaster, intersects, true);
+    }
+  }
+}
 function getByteLength(width, height, format, type) {
   const typeByteLength = getTextureTypeByteLength(type);
   switch (format) {
@@ -29392,6 +29593,25 @@ class SceneManager {
   formationGroup;
   gltfloader;
   targetPositions = [];
+  slotGroup = new Group;
+  loadedVehicles = new Map;
+  raycaster = new Raycaster;
+  mouse = new Vector2;
+  TIER_CONFIG = {
+    Vanguard: [{ id: 0, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 }],
+    Sentinel: [
+      { id: 0, role: "LEAD", x: 0, z: -8, color: 65280 },
+      { id: 1, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
+      { id: 2, role: "REAR", x: 0, z: 8, color: 65280 }
+    ],
+    Praetorian: [
+      { id: 0, role: "SWEEPER", x: 0, z: -14, color: 65535 },
+      { id: 1, role: "LEAD", x: 0, z: -7, color: 65280 },
+      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
+      { id: 3, role: "CAT", x: 0, z: 7, color: 16711680 },
+      { id: 4, role: "ECM", x: 0, z: 14, color: 255 }
+    ]
+  };
   constructor() {
     this.container = document.getElementById("canvas-container");
     if (!this.container)
@@ -29443,7 +29663,7 @@ class SceneManager {
           node.receiveShadow = true;
         }
       });
-      this.principalModel.scale.set(1.5, 1.5, 1.5);
+      this.principalModel.scale.set(1, 1, 1);
       this.principalModel.visible = false;
       this.scene.add(this.principalModel);
       console.log("Sentinel: Principal Model Loaded");
@@ -29458,6 +29678,7 @@ class SceneManager {
     if (this.videoElement)
       this.videoElement.pause();
     this.formationGroup.visible = true;
+    this.slotGroup.visible = false;
     if (!this.principalModel) {
       console.warn("Principal model not loaded yet.");
       return;
@@ -29602,6 +29823,104 @@ class SceneManager {
     this.bgMesh = new Mesh(geometry, material);
     this.bgMesh.position.set(0, -2, -5);
     this.scene.add(this.bgMesh);
+  }
+  initMotorcadeMode(tier = "Vanguard") {
+    console.log(`Sentinel: Initializing Motorcade for [${tier}]`);
+    if (this.bgMesh) {
+      this.bgMesh.visible = false;
+      this.scene.remove(this.bgMesh);
+    }
+    if (this.videoElement) {
+      this.videoElement.pause();
+    }
+    this.formationGroup.visible = false;
+    this.principalInstances.forEach((p) => {
+      p.visible = false;
+    });
+    this.camera.position.set(15, 12, 15);
+    this.camera.lookAt(0, 0, 0);
+    this.slotGroup.clear();
+    this.scene.add(this.slotGroup);
+    const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    if (!config)
+      return;
+    config.forEach((slotData) => {
+      this.createHolographicSlot(slotData);
+    });
+    window.addEventListener("click", this.onMouseClick.bind(this));
+    this.slotGroup.visible = true;
+  }
+  createHolographicSlot(data) {
+    const geometry = new BoxGeometry(3.5, 0.1, 6);
+    const material = new MeshBasicMaterial({
+      color: data.color,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.5
+    });
+    const slot = new Mesh(geometry, material);
+    slot.position.set(data.x, 0, data.z);
+    slot.userData = { id: data.id, role: data.role, type: "slot" };
+    const poleGeo = new CylinderGeometry(0.05, 0.05, 2);
+    const poleMat = new MeshBasicMaterial({ color: data.color });
+    const pole = new Mesh(poleGeo, poleMat);
+    pole.position.y = 1;
+    slot.add(pole);
+    this.slotGroup.add(slot);
+  }
+  onMouseClick(event) {
+    this.mouse.x = event.clientX / window.innerWidth * 2 - 1;
+    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.slotGroup.children, false);
+    if (intersects.length > 0) {
+      const userData = intersects[0]?.object.userData;
+      if (userData?.type === "slot") {
+        console.log(`Sentinel: Clicked Slot ${userData.role}`);
+        document.body.dispatchEvent(new CustomEvent("sentinel-garage-open", {
+          detail: { slotId: userData.id, role: userData.role }
+        }));
+      }
+    }
+  }
+  spawnVehicle(slotId, vehicleType) {
+    const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
+    if (!slot)
+      return;
+    if (this.loadedVehicles.has(slotId)) {
+      const old = this.loadedVehicles.get(slotId);
+      if (old)
+        this.scene.remove(old);
+    }
+    const modelMap = {
+      Escalade: "/public/assets/models/CadillacEscalade_Optimized-v1.glb",
+      G63: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
+      Suburban: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
+      F150: "/public/assets/models/FordF150_Optimized-v3.glb",
+      BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb"
+    };
+    const path = modelMap[vehicleType];
+    if (!path)
+      return;
+    this.gltfloader.load(path, (gltf) => {
+      const vehicle = gltf.scene;
+      vehicle.position.copy(slot.position);
+      vehicle.rotation.y = Math.PI;
+      vehicle.scale.set(1, 1, 1);
+      vehicle.position.y = 5;
+      const targetY = 0;
+      this.scene.add(vehicle);
+      this.loadedVehicles.set(slotId, vehicle);
+      const drop = () => {
+        if (vehicle.position.y > targetY) {
+          vehicle.position.y -= 0.2;
+          requestAnimationFrame(drop);
+        } else {
+          vehicle.position.y = targetY;
+        }
+      };
+      drop();
+    });
   }
 }
 
