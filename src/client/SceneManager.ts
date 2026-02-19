@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export class SceneManager {
   private static instance: SceneManager;
@@ -8,6 +9,7 @@ export class SceneManager {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
+  private controls: OrbitControls | null = null;
   private videoTexture: THREE.VideoTexture | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private bgMesh: THREE.Mesh | null = null;
@@ -35,20 +37,36 @@ export class SceneManager {
   private mouse = new THREE.Vector2();
 
   private readonly TIER_CONFIG: Record<string, any[]> = {
-    Vanguard: [{ id: 0, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 }],
+    Vanguard: [
+      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
+      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
+      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
+    ],
     Sentinel: [
-      { id: 0, role: "LEAD", x: 0, z: -8, color: 0x00ff00 },
-      { id: 1, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 2, role: "REAR", x: 0, z: 8, color: 0x00ff00 },
+      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
+      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
+      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
     ],
     Praetorian: [
-      { id: 0, role: "SWEEPER", x: 0, z: -14, color: 0x00ffff },
-      { id: 1, role: "LEAD", x: 0, z: -7, color: 0x00ff00 },
+      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
+      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: 7, color: 0xff0000 },
-      { id: 4, role: "ECM", x: 0, z: 14, color: 0x0000ff },
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
     ],
   };
+
+  // Camera Lerping
+  private cameraTargetPos: THREE.Vector3 = new THREE.Vector3(0, 8, 12);
+  private cameraLookAt: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  private motorcadeSpotLight: THREE.SpotLight | null = null;
+  private groundPlane: THREE.Mesh | null = null;
+  private isMotorcade: boolean = false;
+  private skipFormationAnimation: boolean = false;
 
   private constructor() {
     this.container = document.getElementById("canvas-container") as HTMLElement;
@@ -72,6 +90,24 @@ export class SceneManager {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
+
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.enabled = false;
+
+    // Ground Plane for Motorcade Lighting
+    const groundGeo = new THREE.PlaneGeometry(200, 200);
+    const groundMat = new THREE.MeshStandardMaterial({ 
+      color: 0x444444,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+    this.groundPlane = new THREE.Mesh(groundGeo, groundMat);
+    this.groundPlane.rotation.x = -Math.PI / 2;
+    this.groundPlane.position.y = -0.05;
+    this.groundPlane.receiveShadow = true;
+    this.groundPlane.visible = false;
+    this.scene.add(this.groundPlane);
 
     // const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     // this.scene.add(ambientLight);
@@ -139,6 +175,11 @@ export class SceneManager {
 
   public updatePrincipals(count: number) {
     console.log(`Sentinel: Updating Formation to ${count}`);
+
+    this.isMotorcade = false;
+    this.skipFormationAnimation = false; 
+    if(this.controls) this.controls.enabled = false;
+    if(this.groundPlane) this.groundPlane.visible = false;
 
     this.camera.position.set(4, 5, 4);
     this.camera.lookAt(0, 0.5, 0);
@@ -271,14 +312,22 @@ export class SceneManager {
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this));
 
+    if (this.controls && this.controls.enabled) {
+        this.controls.update();
+        // Skip camera lerping when controls are active to allow free movement
+    } else if (this.isMotorcade) {
+      this.camera.position.lerp(this.cameraTargetPos, 0.05);
+      this.camera.lookAt(this.cameraLookAt);
+    }
+
     // Put animation here:
     if (this.formationGroup.visible) {
       this.principalInstances.forEach((model, index) => {
         const target = this.targetPositions[index];
         if (!target) return;
-        // Lerp sliding
+
+        // Revert to original behavior
         model.position.lerp(target, 0.08);
-        // Pop effect for new clone
         model.scale.lerp(new THREE.Vector3(1.5, 1.5, 1.5), 0.1);
         model.lookAt(-10, 0, 0);
       });
@@ -295,6 +344,10 @@ export class SceneManager {
     // Debug theme
     console.log(`Sentinel 3D: Switching to [${themeId}]`);
 
+    this.isMotorcade = false;
+    this.skipFormationAnimation = false;
+    if(this.controls) this.controls.enabled = false;
+
     if (themeId !== "black") {
       this.camera.position.set(0, 0, 8);
       this.camera.lookAt(0, 0, 0);
@@ -305,7 +358,10 @@ export class SceneManager {
 
     if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
       if (this.bgMesh) this.bgMesh.visible = false;
-      if (this.videoElement) this.videoElement.pause();
+      if (this.videoElement) {
+        this.videoElement.pause();
+        this.videoElement.style.display = "none";
+      }
       this.currentTheme = "black";
       return;
     }
@@ -319,6 +375,7 @@ export class SceneManager {
     }
 
     if (this.videoElement) {
+      this.videoElement.style.display = "block";
       if (!this.videoElement.src.includes(videoPath)) {
         this.videoElement.src = videoPath;
       }
@@ -337,6 +394,7 @@ export class SceneManager {
     this.videoElement.loop = false;
     this.videoElement.muted = true;
     this.videoElement.playsInline = true;
+    this.videoElement.style.display = "none";
     this.videoElement.play();
 
     this.videoTexture = new THREE.VideoTexture(this.videoElement);
@@ -360,13 +418,21 @@ export class SceneManager {
   public initMotorcadeMode(tier: string = "Vanguard") {
     console.log(`Sentinel: Initializing Motorcade for [${tier}]`);
 
+    this.isMotorcade = true;
+    if(this.controls) {
+        this.controls.enabled = true;
+        this.controls.target.set(0, 0, 0);
+        this.controls.update();
+    }
+    if(this.groundPlane) this.groundPlane.visible = true;
+
     // --- NUCLEAR CLEANUP ---
     if (this.bgMesh) {
       this.bgMesh.visible = false;
-      this.scene.remove(this.bgMesh);
     }
     if (this.videoElement) {
       this.videoElement.pause();
+      this.videoElement.style.display = "none";
     }
 
     this.formationGroup.visible = false;
@@ -374,9 +440,27 @@ export class SceneManager {
       p.visible = false;
     });
 
-    // Reset Camera
-    this.camera.position.set(15, 12, 15);
-    this.camera.lookAt(0, 0, 0);
+    // Horizontal Side View Camera (90 Degree Rotation)
+    this.cameraTargetPos.set(25, 8, 0); // Side view
+    this.cameraLookAt.set(0, 0, 0);
+    this.camera.position.copy(this.cameraTargetPos);
+    this.camera.lookAt(this.cameraLookAt);
+
+    // Stage Light (SpotLight) - Bright top-down conelight
+    if (!this.motorcadeSpotLight) {
+      this.motorcadeSpotLight = new THREE.SpotLight(0xffffff, 5000);
+      this.motorcadeSpotLight.angle = Math.PI / 8;
+      this.motorcadeSpotLight.penumbra = 0.4;
+      this.motorcadeSpotLight.decay = 2;
+      this.motorcadeSpotLight.distance = 150;
+      this.motorcadeSpotLight.castShadow = true;
+      this.scene.add(this.motorcadeSpotLight);
+      this.scene.add(this.motorcadeSpotLight.target);
+    }
+    this.motorcadeSpotLight.position.set(0, 40, 0);
+    this.motorcadeSpotLight.target.position.set(0, 0, 0);
+    this.motorcadeSpotLight.visible = true;
+
     // -----------------------
 
     this.slotGroup.clear();
@@ -393,17 +477,53 @@ export class SceneManager {
     this.slotGroup.visible = true;
   }
 
+  public focusOnSlot(slotId: number) {
+    const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
+    if (!slot) return;
+
+    // Close up side angle
+    this.cameraTargetPos.set(12, 4, slot.position.z);
+    this.cameraLookAt.set(0, 0, slot.position.z);
+
+    if (this.controls) {
+      // Snap camera for immediate feedback
+      this.camera.position.copy(this.cameraTargetPos);
+      this.controls.target.set(0, 0, slot.position.z);
+      this.controls.update();
+    }
+
+    if (this.motorcadeSpotLight) {
+      this.motorcadeSpotLight.position.set(slot.position.x, 40, slot.position.z);
+      this.motorcadeSpotLight.target.position.set(slot.position.x, 0, slot.position.z);
+    }
+  }
+
+  public resetMotorcadeCamera() {
+    this.cameraTargetPos.set(25, 8, 0);
+    this.cameraLookAt.set(0, 0, 0);
+
+    if(this.controls) {
+        this.controls.target.set(0, 0, 0);
+        this.controls.update();
+    }
+
+    if (this.motorcadeSpotLight) {
+      this.motorcadeSpotLight.position.set(0, 40, 0);
+      this.motorcadeSpotLight.target.position.set(0, 0, 0);
+    }
+  }
+
   private createHolographicSlot(data: any) {
-    // Glowing Floor Box
+    // Glowing Floor Box - Using EdgesGeometry for a clean rectangle without diagonals
     const geometry = new THREE.BoxGeometry(3.5, 0.1, 6);
-    const material = new THREE.MeshBasicMaterial({
+    const edges = new THREE.EdgesGeometry(geometry);
+    const material = new THREE.LineBasicMaterial({
       color: data.color,
-      wireframe: true,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.8,
     });
 
-    const slot = new THREE.Mesh(geometry, material);
+    const slot = new THREE.LineSegments(edges, material);
     slot.position.set(data.x, 0, data.z);
     slot.userData = { id: data.id, role: data.role, type: "slot" };
 
@@ -433,6 +553,8 @@ export class SceneManager {
       const userData = intersects[0]?.object.userData;
       if (userData?.type === "slot") {
         console.log(`Sentinel: Clicked Slot ${userData.role}`);
+
+        this.focusOnSlot(userData.id);
 
         document.body.dispatchEvent(
           new CustomEvent("sentinel-garage-open", {
@@ -471,7 +593,7 @@ export class SceneManager {
       vehicle.position.copy(slot.position);
 
       // Rotation
-      vehicle.rotation.y = Math.PI; // Face forward
+      vehicle.rotation.y = 0; // Face forward (towards positive Z / Left)
       // Scale Consistency
       vehicle.scale.set(1, 1, 1);
       // Animate In
