@@ -67,6 +67,7 @@ export class SceneManager {
   private groundPlane: THREE.Mesh | null = null;
   private isMotorcade: boolean = false;
   private skipFormationAnimation: boolean = false;
+  private isTransitioning: boolean = false;
 
   private constructor() {
     this.container = document.getElementById("canvas-container") as HTMLElement;
@@ -93,7 +94,15 @@ export class SceneManager {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+    this.controls.minDistance = 5;
+    this.controls.maxDistance = 50;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.1; // Prevent going below floor
     this.controls.enabled = false;
+
+    this.controls.addEventListener("start", () => {
+      this.isTransitioning = false;
+    });
 
     // Ground Plane for Motorcade Lighting
     const groundGeo = new THREE.PlaneGeometry(200, 200);
@@ -312,12 +321,24 @@ export class SceneManager {
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this));
 
-    if (this.controls && this.controls.enabled) {
+    if (this.isMotorcade) {
+      if (this.controls && this.controls.enabled) {
+        if (this.isTransitioning) {
+          this.camera.position.lerp(this.cameraTargetPos, 0.08);
+          this.controls.target.lerp(this.cameraLookAt, 0.08);
+
+          if (
+            this.camera.position.distanceTo(this.cameraTargetPos) < 0.01 &&
+            this.controls.target.distanceTo(this.cameraLookAt) < 0.01
+          ) {
+            this.isTransitioning = false;
+          }
+        }
         this.controls.update();
-        // Skip camera lerping when controls are active to allow free movement
-    } else if (this.isMotorcade) {
-      this.camera.position.lerp(this.cameraTargetPos, 0.05);
-      this.camera.lookAt(this.cameraLookAt);
+      } else {
+        this.camera.position.lerp(this.cameraTargetPos, 0.05);
+        this.camera.lookAt(this.cameraLookAt);
+      }
     }
 
     // Put animation here:
@@ -484,13 +505,7 @@ export class SceneManager {
     // Close up side angle
     this.cameraTargetPos.set(12, 4, slot.position.z);
     this.cameraLookAt.set(0, 0, slot.position.z);
-
-    if (this.controls) {
-      // Snap camera for immediate feedback
-      this.camera.position.copy(this.cameraTargetPos);
-      this.controls.target.set(0, 0, slot.position.z);
-      this.controls.update();
-    }
+    this.isTransitioning = true;
 
     if (this.motorcadeSpotLight) {
       this.motorcadeSpotLight.position.set(slot.position.x, 40, slot.position.z);
@@ -501,11 +516,7 @@ export class SceneManager {
   public resetMotorcadeCamera() {
     this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
-
-    if(this.controls) {
-        this.controls.target.set(0, 0, 0);
-        this.controls.update();
-    }
+    this.isTransitioning = true;
 
     if (this.motorcadeSpotLight) {
       this.motorcadeSpotLight.position.set(0, 40, 0);

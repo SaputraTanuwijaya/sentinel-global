@@ -30614,6 +30614,7 @@ class SceneManager {
   groundPlane = null;
   isMotorcade = false;
   skipFormationAnimation = false;
+  isTransitioning = false;
   constructor() {
     this.container = document.getElementById("canvas-container");
     if (!this.container)
@@ -30630,7 +30631,14 @@ class SceneManager {
     this.container.appendChild(this.renderer.domElement);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+    this.controls.minDistance = 5;
+    this.controls.maxDistance = 50;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.1;
     this.controls.enabled = false;
+    this.controls.addEventListener("start", () => {
+      this.isTransitioning = false;
+    });
     const groundGeo = new PlaneGeometry(200, 200);
     const groundMat = new MeshStandardMaterial({
       color: 4473924,
@@ -30780,11 +30788,20 @@ class SceneManager {
   }
   animate() {
     requestAnimationFrame(this.animate.bind(this));
-    if (this.controls && this.controls.enabled) {
-      this.controls.update();
-    } else if (this.isMotorcade) {
-      this.camera.position.lerp(this.cameraTargetPos, 0.05);
-      this.camera.lookAt(this.cameraLookAt);
+    if (this.isMotorcade) {
+      if (this.controls && this.controls.enabled) {
+        if (this.isTransitioning) {
+          this.camera.position.lerp(this.cameraTargetPos, 0.08);
+          this.controls.target.lerp(this.cameraLookAt, 0.08);
+          if (this.camera.position.distanceTo(this.cameraTargetPos) < 0.01 && this.controls.target.distanceTo(this.cameraLookAt) < 0.01) {
+            this.isTransitioning = false;
+          }
+        }
+        this.controls.update();
+      } else {
+        this.camera.position.lerp(this.cameraTargetPos, 0.05);
+        this.camera.lookAt(this.cameraLookAt);
+      }
     }
     if (this.formationGroup.visible) {
       this.principalInstances.forEach((model, index) => {
@@ -30916,11 +30933,7 @@ class SceneManager {
       return;
     this.cameraTargetPos.set(12, 4, slot.position.z);
     this.cameraLookAt.set(0, 0, slot.position.z);
-    if (this.controls) {
-      this.camera.position.copy(this.cameraTargetPos);
-      this.controls.target.set(0, 0, slot.position.z);
-      this.controls.update();
-    }
+    this.isTransitioning = true;
     if (this.motorcadeSpotLight) {
       this.motorcadeSpotLight.position.set(slot.position.x, 40, slot.position.z);
       this.motorcadeSpotLight.target.position.set(slot.position.x, 0, slot.position.z);
@@ -30929,10 +30942,7 @@ class SceneManager {
   resetMotorcadeCamera() {
     this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
-    if (this.controls) {
-      this.controls.target.set(0, 0, 0);
-      this.controls.update();
-    }
+    this.isTransitioning = true;
     if (this.motorcadeSpotLight) {
       this.motorcadeSpotLight.position.set(0, 40, 0);
       this.motorcadeSpotLight.target.position.set(0, 0, 0);
