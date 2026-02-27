@@ -35,7 +35,7 @@ export const Layout = ({ children }: { children: any }) => {
               Estimated Total
             </span>
             <div class="flex items-baseline gap-1">
-              <span class="text-lg text-green-500 font-bold">$</span>
+              <span class="text-lg text-white font-bold">$</span>
               <span
                 id="hud-price"
                 class="text-3xl text-white font-mono font-bold tracking-tight"

@@ -30590,22 +30590,22 @@ class SceneManager {
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
       { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16711680 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 255 }
+      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
     ],
     Sentinel: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
       { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16711680 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 255 }
+      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
     ],
     Praetorian: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
       { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16711680 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 255 }
+      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
     ]
   };
   cameraTargetPos = new Vector3(0, 8, 12);
@@ -30615,6 +30615,7 @@ class SceneManager {
   isMotorcade = false;
   skipFormationAnimation = false;
   isTransitioning = false;
+  boundOnMouseClick;
   constructor() {
     this.container = document.getElementById("canvas-container");
     if (!this.container)
@@ -30633,10 +30634,13 @@ class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
-    this.controls.maxDistance = 50;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.1;
+    this.controls.maxDistance = 80;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
     this.controls.enabled = false;
     this.controls.addEventListener("start", () => {
+      this.isTransitioning = false;
+    });
+    this.renderer.domElement.addEventListener("wheel", () => {
       this.isTransitioning = false;
     });
     const groundGeo = new PlaneGeometry(200, 200);
@@ -30669,6 +30673,8 @@ class SceneManager {
     this.gltfloader.setDRACOLoader(dracoLoader);
     this.preloadPrincipal();
     window.addEventListener("resize", this.onWindowResize.bind(this));
+    this.boundOnMouseClick = this.onMouseClick.bind(this);
+    window.addEventListener("click", this.boundOnMouseClick);
     this.animate();
     window.Sentinel = this;
     console.log("Sentinel SceneManager: Initialized");
@@ -30793,14 +30799,11 @@ class SceneManager {
         if (this.isTransitioning) {
           this.camera.position.lerp(this.cameraTargetPos, 0.08);
           this.controls.target.lerp(this.cameraLookAt, 0.08);
-          if (this.camera.position.distanceTo(this.cameraTargetPos) < 0.01 && this.controls.target.distanceTo(this.cameraLookAt) < 0.01) {
+          if (this.camera.position.distanceTo(this.cameraTargetPos) < 0.05 && this.controls.target.distanceTo(this.cameraLookAt) < 0.05) {
             this.isTransitioning = false;
           }
         }
         this.controls.update();
-      } else {
-        this.camera.position.lerp(this.cameraTargetPos, 0.05);
-        this.camera.lookAt(this.cameraLookAt);
       }
     }
     if (this.formationGroup.visible) {
@@ -30924,7 +30927,6 @@ class SceneManager {
     config.forEach((slotData) => {
       this.createHolographicSlot(slotData);
     });
-    window.addEventListener("click", this.onMouseClick.bind(this));
     this.slotGroup.visible = true;
   }
   focusOnSlot(slotId) {
@@ -30967,6 +30969,11 @@ class SceneManager {
     this.slotGroup.add(slot);
   }
   onMouseClick(event) {
+    if (!this.isMotorcade)
+      return;
+    const drawer = document.getElementById("garage-drawer");
+    if (drawer && !drawer.classList.contains("translate-x-full"))
+      return;
     this.mouse.x = event.clientX / window.innerWidth * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
@@ -30982,7 +30989,7 @@ class SceneManager {
       }
     }
   }
-  spawnVehicle(slotId, vehicleType) {
+  spawnVehicle(slotId, vehicleType, amount = 1) {
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot)
       return;
@@ -30990,7 +30997,10 @@ class SceneManager {
       const old = this.loadedVehicles.get(slotId);
       if (old)
         this.scene.remove(old);
+      this.loadedVehicles.delete(slotId);
     }
+    if (vehicleType === "none")
+      return;
     const modelMap = {
       Escalade: "/public/assets/models/CadillacEscalade_Optimized-v1.glb",
       G63: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
@@ -31001,24 +31011,46 @@ class SceneManager {
     const path = modelMap[vehicleType];
     if (!path)
       return;
-    this.gltfloader.load(path, (gltf) => {
-      const vehicle = gltf.scene;
-      vehicle.position.copy(slot.position);
-      vehicle.rotation.y = 0;
-      vehicle.scale.set(1, 1, 1);
-      vehicle.position.y = 5;
-      const targetY = 0;
-      this.scene.add(vehicle);
-      this.loadedVehicles.set(slotId, vehicle);
-      const drop = () => {
-        if (vehicle.position.y > targetY) {
-          vehicle.position.y -= 0.2;
-          requestAnimationFrame(drop);
+    const group = new Group;
+    group.position.copy(slot.position);
+    this.scene.add(group);
+    this.loadedVehicles.set(slotId, group);
+    const spacing = 4;
+    const offsets = [];
+    if (amount === 1) {
+      offsets.push(new Vector3(0, 0, 0));
+    } else if (amount === 2) {
+      offsets.push(new Vector3(-spacing / 2, 0, 0));
+      offsets.push(new Vector3(spacing / 2, 0, 0));
+    } else if (amount === 3) {
+      offsets.push(new Vector3(0, 0, spacing / 2));
+      offsets.push(new Vector3(-spacing / 2, 0, -spacing / 2));
+      offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
+    }
+    offsets.forEach((offset) => {
+      this.gltfloader.load(path, (gltf) => {
+        const vehicle = gltf.scene;
+        vehicle.position.copy(offset);
+        if (vehicleType === "F150") {
+          vehicle.rotation.y = Math.PI;
         } else {
-          vehicle.position.y = targetY;
+          vehicle.rotation.y = 0;
         }
-      };
-      drop();
+        vehicle.scale.set(1, 1, 1);
+        const initialY = 5;
+        vehicle.position.y += initialY;
+        group.add(vehicle);
+        const targetY = offset.y;
+        const drop = () => {
+          if (vehicle.position.y > targetY) {
+            vehicle.position.y -= 0.2;
+            requestAnimationFrame(drop);
+          } else {
+            vehicle.position.y = targetY;
+          }
+        };
+        drop();
+      });
     });
   }
 }

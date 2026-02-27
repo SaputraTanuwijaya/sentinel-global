@@ -38,25 +38,25 @@ export class SceneManager {
 
   private readonly TIER_CONFIG: Record<string, any[]> = {
     Vanguard: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
+      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff }, // Cyan
+      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },    // Gray
+      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 }, // Gold
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },   // Red
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },   // Blue
     ],
     Sentinel: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
       { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },
     ],
     Praetorian: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
       { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff0000 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x0000ff },
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },
     ],
   };
 
@@ -68,6 +68,7 @@ export class SceneManager {
   private isMotorcade: boolean = false;
   private skipFormationAnimation: boolean = false;
   private isTransitioning: boolean = false;
+  private boundOnMouseClick: (event: MouseEvent) => void;
 
   private constructor() {
     this.container = document.getElementById("canvas-container") as HTMLElement;
@@ -96,12 +97,18 @@ export class SceneManager {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
-    this.controls.maxDistance = 50;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.1; // Prevent going below floor
+    this.controls.maxDistance = 80;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent going below floor
     this.controls.enabled = false;
 
+    // Handle manual interaction to stop transitions
     this.controls.addEventListener("start", () => {
       this.isTransitioning = false;
+    });
+
+    // Zooming also stops transitions
+    this.renderer.domElement.addEventListener("wheel", () => {
+        this.isTransitioning = false;
     });
 
     // Ground Plane for Motorcade Lighting
@@ -145,7 +152,11 @@ export class SceneManager {
     this.preloadPrincipal();
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
-    // this.changeBackground("black");
+    
+    // Bind and add click handler once
+    this.boundOnMouseClick = this.onMouseClick.bind(this);
+    window.addEventListener("click", this.boundOnMouseClick);
+
     this.animate();
 
     (window as any).Sentinel = this;
@@ -328,16 +339,13 @@ export class SceneManager {
           this.controls.target.lerp(this.cameraLookAt, 0.08);
 
           if (
-            this.camera.position.distanceTo(this.cameraTargetPos) < 0.01 &&
-            this.controls.target.distanceTo(this.cameraLookAt) < 0.01
+            this.camera.position.distanceTo(this.cameraTargetPos) < 0.05 &&
+            this.controls.target.distanceTo(this.cameraLookAt) < 0.05
           ) {
             this.isTransitioning = false;
           }
         }
         this.controls.update();
-      } else {
-        this.camera.position.lerp(this.cameraTargetPos, 0.05);
-        this.camera.lookAt(this.cameraLookAt);
       }
     }
 
@@ -494,7 +502,6 @@ export class SceneManager {
       this.createHolographicSlot(slotData);
     });
 
-    window.addEventListener("click", this.onMouseClick.bind(this));
     this.slotGroup.visible = true;
   }
 
@@ -549,6 +556,12 @@ export class SceneManager {
   }
 
   private onMouseClick(event: MouseEvent) {
+    if (!this.isMotorcade) return;
+
+    // IGNORE CLICKS IF GARAGE DRAWER IS OPEN
+    const drawer = document.getElementById('garage-drawer');
+    if (drawer && !drawer.classList.contains('translate-x-full')) return;
+
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -576,7 +589,7 @@ export class SceneManager {
     }
   }
 
-  public spawnVehicle(slotId: number, vehicleType: string) {
+  public spawnVehicle(slotId: number, vehicleType: string, amount: number = 1) {
     // Find the slot position
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot) return;
@@ -585,7 +598,10 @@ export class SceneManager {
     if (this.loadedVehicles.has(slotId)) {
       const old = this.loadedVehicles.get(slotId);
       if (old) this.scene.remove(old);
+      this.loadedVehicles.delete(slotId);
     }
+
+    if (vehicleType === "none") return;
 
     // Map vehicleType to GLB Path
     const modelMap: Record<string, string> = {
@@ -599,30 +615,58 @@ export class SceneManager {
     const path = modelMap[vehicleType];
     if (!path) return;
 
-    this.gltfloader.load(path, (gltf) => {
-      const vehicle = gltf.scene;
-      vehicle.position.copy(slot.position);
+    const group = new THREE.Group();
+    group.position.copy(slot.position);
+    this.scene.add(group);
+    this.loadedVehicles.set(slotId, group);
 
-      // Rotation
-      vehicle.rotation.y = 0; // Face forward (towards positive Z / Left)
-      // Scale Consistency
-      vehicle.scale.set(1, 1, 1);
-      // Animate In
-      vehicle.position.y = 5;
-      const targetY = 0;
+    const spacing = 4.0;
+    const offsets: THREE.Vector3[] = [];
 
-      this.scene.add(vehicle);
-      this.loadedVehicles.set(slotId, vehicle);
+    if (amount === 1) {
+        offsets.push(new THREE.Vector3(0, 0, 0));
+    } else if (amount === 2) {
+        // Side by Side (along X axis for a motorcade look)
+        offsets.push(new THREE.Vector3(-spacing/2, 0, 0));
+        offsets.push(new THREE.Vector3(spacing/2, 0, 0));
+    } else if (amount === 3) {
+        // Triangular
+        offsets.push(new THREE.Vector3(0, 0, spacing/2)); // Front
+        offsets.push(new THREE.Vector3(-spacing/2, 0, -spacing/2)); // Back Left
+        offsets.push(new THREE.Vector3(spacing/2, 0, -spacing/2));  // Back Right
+    }
 
-      const drop = () => {
-        if (vehicle.position.y > targetY) {
-          vehicle.position.y -= 0.2;
-          requestAnimationFrame(drop);
-        } else {
-          vehicle.position.y = targetY;
-        }
-      };
-      drop();
+    offsets.forEach((offset) => {
+        this.gltfloader.load(path, (gltf) => {
+            const vehicle = gltf.scene;
+            vehicle.position.copy(offset);
+            
+            // Rotation - Ford F150 is facing backwards, rotate 180 degrees
+            if (vehicleType === "F150") {
+              vehicle.rotation.y = Math.PI;
+            } else {
+              vehicle.rotation.y = 0; // Face forward
+            }
+      
+            vehicle.scale.set(1, 1, 1);
+            
+            // Animate In (Drop)
+            const initialY = 5;
+            vehicle.position.y += initialY;
+            
+            group.add(vehicle);
+      
+            const targetY = offset.y;
+            const drop = () => {
+              if (vehicle.position.y > targetY) {
+                vehicle.position.y -= 0.2;
+                requestAnimationFrame(drop);
+              } else {
+                vehicle.position.y = targetY;
+              }
+            };
+            drop();
+          });
     });
   }
 }

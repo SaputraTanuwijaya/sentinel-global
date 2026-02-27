@@ -29,27 +29,27 @@ export const Motorcade = () => {
 
         <div class="mt-2 flex gap-6 text-xs text-gray-400 uppercase tracking-widest">
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 bg-yellow-500 rounded-full"></div> 
+            <div class="w-3 h-3 bg-yellow-500 rounded-full shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div> 
             <span>Principal</span>
             <Tooltip desc="The High-Value Individual (HVI) transport vehicle." />
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 bg-gray-500 rounded-full"></div> 
+            <div class="w-3 h-3 bg-gray-500 rounded-full shadow-[0_0_10px_rgba(107,114,128,0.5)]"></div> 
             <span>Lead / Escort</span>
             <Tooltip desc="Lead pursuit and tactical clearing units." />
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 bg-red-500 rounded-full"></div> 
+            <div class="w-3 h-3 bg-red-500 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]"></div> 
             <span>CAT</span>
             <Tooltip desc="Counter Assault Team: Rapid response heavy protection." />
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 bg-blue-500 rounded-full"></div> 
+            <div class="w-3 h-3 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div> 
             <span>ECM</span>
             <Tooltip desc="Electronic Countermeasures: Sigint and tech support." />
           </div>
            <div class="flex items-center gap-2">
-            <div class="w-3 h-3 bg-cyan-500 rounded-full"></div> 
+            <div class="w-3 h-3 bg-cyan-500 rounded-full shadow-[0_0_10px_rgba(6,182,212,0.5)]"></div> 
             <span>Sweeper</span>
             <Tooltip desc="Advanced scout and route reconnaissance units." />
           </div>
@@ -65,10 +65,10 @@ export const Motorcade = () => {
           <div class="flex justify-between items-center mb-8">
             <div>
               <h3 class="text-2xl text-white font-bold uppercase tracking-widest">
-                <span class="text-sentinel-hud mr-2">///</span>
+                <span class="text-white/40 mr-2">///</span>
                 <span id="drawer-title">Assign Vehicle:</span>
               </h3>
-              <div id="slot-role-title" class="text-sentinel-hud text-sm font-bold uppercase mt-1">
+              <div id="slot-role-title" class="text-white/60 text-sm font-bold uppercase mt-1">
                   ...
               </div>
             </div>
@@ -98,30 +98,41 @@ export const Motorcade = () => {
                 <h4 id="detail-name" class="text-3xl text-white font-bold uppercase tracking-tighter mb-2">Vehicle Name</h4>
                 <p id="detail-desc" class="text-gray-400 text-sm mb-6 leading-relaxed">Detailed description of the tactical capabilities and armor specifications for this unit.</p>
                 
+                {/* Amount Selector (Shown for Sweeper and Principal) */}
+                <div id="amount-selector-container" class="hidden mb-6 bg-white/5 border border-white/10 p-4 rounded-xl">
+                    <span class="text-[10px] text-gray-500 uppercase tracking-widest block mb-2">Unit Quantity</span>
+                    <div class="flex items-center gap-4">
+                        <button onclick="changeAmount(-1)" class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors">-</button>
+                        <span id="vehicle-amount" class="text-2xl font-bold text-white w-8 text-center">1</span>
+                        <button onclick="changeAmount(1)" class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors">+</button>
+                        <span class="text-[10px] text-gray-400 italic ml-2" id="formation-desc">Single Unit</span>
+                    </div>
+                </div>
+
                 {/* Specs Reveal Button */}
                 <button 
                     id="specs-toggle-btn"
                     onclick="toggleSpecs()"
-                    class="text-[10px] text-sentinel-hud font-bold uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors mb-4"
+                    class="text-[10px] text-white font-bold uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors mb-4"
                 >
                     <span id="specs-btn-icon">[+]</span> View Technical Specifications
                 </button>
 
                 {/* Specs List (Hidden by default) */}
                 <div id="specs-list" class="hidden space-y-4 mb-8 border-t border-white/5 pt-4">
-                    <div class="border-l-2 border-sentinel-hud pl-4 py-1">
+                    <div class="border-l-2 border-white/30 pl-4 py-1">
                         <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Armor Class</span>
                         <span id="spec-armor" class="text-white font-bold uppercase text-sm">Level B7+</span>
                     </div>
-                    <div class="border-l-2 border-sentinel-hud pl-4 py-1">
+                    <div class="border-l-2 border-white/30 pl-4 py-1">
                         <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Payload Capacity</span>
                         <span id="spec-payload" class="text-white font-bold uppercase text-sm">2,400 LBS</span>
                     </div>
-                    <div class="border-l-2 border-sentinel-hud pl-4 py-1">
+                    <div class="border-l-2 border-white/30 pl-4 py-1">
                         <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Max Sustained Speed</span>
                         <span id="spec-speed" class="text-white font-bold uppercase text-sm">155 MPH</span>
                     </div>
-                    <div class="border-l-2 border-sentinel-hud pl-4 py-1">
+                    <div class="border-l-2 border-white/30 pl-4 py-1">
                         <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Standard Occupancy</span>
                         <span id="spec-occupancy" class="text-white font-bold uppercase text-sm">4 Operators</span>
                     </div>
@@ -131,7 +142,7 @@ export const Motorcade = () => {
              <div class="pt-6 border-t border-white/10 mt-auto flex flex-col gap-3 shrink-0">
                 <button 
                     onclick="deployAsset()"
-                    class="w-full py-4 bg-sentinel-hud text-black font-bold uppercase tracking-widest hover:bg-white transition-colors"
+                    class="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
                 >
                     Deploy Vehicle
                 </button>
@@ -150,7 +161,9 @@ export const Motorcade = () => {
       <script>
         {`
          let currentSlotId = null;
+         let currentRole = null;
          let selectedVehicle = null;
+         let vehicleAmount = 1;
 
          // Wait for Sentinel to be ready
          const initInterval = setInterval(() => {
@@ -164,25 +177,31 @@ export const Motorcade = () => {
          // DATABASE: Expanded Vehicle Constraints
          const VEHICLE_DB = {
              'PRINCIPAL': [
-                 { id: 'Escalade', name: 'Cadillac Escalade', desc: 'Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.', img: 'Armored', specs: { armor: 'B7 (Heavy)', payload: '1,800kg', speed: '130mph', occ: '2+2' } }
+                 { id: 'Escalade', name: 'Cadillac Escalade', desc: 'Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.', img: 'Armored', specs: { armor: 'B7 (Heavy)', payload: '1,800kg', speed: '130mph', occ: '2+2' } },
+                 { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ],
              'LEAD': [
                  { id: 'F150', name: 'Ford F-150', desc: 'Heavy Pursuit & Ramming Vehicle. Equipped with bull bars and high-torque engine for roadblock clearance.', img: 'Heavy', specs: { armor: 'B6 (Light)', payload: '2,500kg', speed: '110mph', occ: '4' } },
-                 { id: 'G63', name: 'Mercedes G63', desc: 'High-Speed Tactical Escort. Superior off-road capability and 360-degree field of fire.', img: 'Tactical', specs: { armor: 'B6 (Mid)', payload: '1,200kg', speed: '150mph', occ: '4' } }
+                 { id: 'G63', name: 'Mercedes G63', desc: 'High-Speed Tactical Escort. Superior off-road capability and 360-degree field of fire.', img: 'Tactical', specs: { armor: 'B6 (Mid)', payload: '1,200kg', speed: '150mph', occ: '4' } },
+                 { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ],
              'REAR': [
                 { id: 'Suburban', name: 'Chevy Suburban', desc: 'Support & Medical Evacuation. Carries trauma kits and secondary communication arrays.', img: 'Support', specs: { armor: 'B6', payload: '2,000kg', speed: '120mph', occ: '6' } },
-                { id: 'F150', name: 'Ford F-150 Support', desc: 'Tactical Support Vehicle. Cargo-optimized for logistics and gear.', img: 'Logistics', specs: { armor: 'B5', payload: '3,000kg', speed: '105mph', occ: '2' } }
+                { id: 'F150', name: 'Ford F-150 Support', desc: 'Tactical Support Vehicle. Cargo-optimized for logistics and gear.', img: 'Logistics', specs: { armor: 'B5', payload: '3,000kg', speed: '105mph', occ: '2' } },
+                { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ],
              'SWEEPER': [
-                 { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', img: 'Scout', specs: { armor: 'None', payload: '150kg', speed: '185mph', occ: '1' } }
+                 { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', img: 'Scout', specs: { armor: 'None', payload: '150kg', speed: '185mph', occ: '1' } },
+                 { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ],
              'CAT': [
                  { id: 'G63', name: 'Mercedes G63 CAT', desc: 'Counter Assault Team Unit. Integrated weapons storage and rapid egress points for tactical operators.', img: 'Assault', specs: { armor: 'B6+', payload: '1,100kg', speed: '145mph', occ: '5' } },
-                 { id: 'F150', name: 'Ford F-150 Heavy', desc: 'Mobile Cover Unit. Extended bed for rear-facing suppression fire.', img: 'Support', specs: { armor: 'B7 (Partial)', payload: '3,000kg', speed: '100mph', occ: '3' } }
+                 { id: 'F150', name: 'Ford F-150 Heavy', desc: 'Mobile Cover Unit. Extended bed for rear-facing suppression fire.', img: 'Support', specs: { armor: 'B7 (Partial)', payload: '3,000kg', speed: '100mph', occ: '3' } },
+                 { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ],
              'ECM': [
-                 { id: 'Suburban', name: 'Chevy Suburban ECM', desc: 'Electronic Countermeasures. Signal jamming suite for IED neutralization and secure comms uplink.', img: 'Tech', specs: { armor: 'B6', payload: '1,500kg', speed: '120mph', occ: '2' } }
+                 { id: 'Suburban', name: 'Chevy Suburban ECM', desc: 'Electronic Countermeasures. Signal jamming suite for IED neutralization and secure comms uplink.', img: 'Tech', specs: { armor: 'B6', payload: '1,500kg', speed: '120mph', occ: '2' } },
+                 { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', payload: '--', speed: '--', occ: '--' } }
              ]
          };
 
@@ -190,6 +209,8 @@ export const Motorcade = () => {
          document.body.addEventListener('sentinel-garage-open', (e) => {
              const { slotId, role } = e.detail;
              currentSlotId = slotId;
+             currentRole = role;
+             vehicleAmount = 1; // Reset
              
              // Update Title
              document.getElementById('slot-role-title').innerText = role;
@@ -212,7 +233,7 @@ export const Motorcade = () => {
                     </div>
                     <div>
                         <h4 class="text-white font-bold tracking-wider text-sm">\${car.name}</h4>
-                        <p class="text-[10px] text-sentinel-hud uppercase mt-1">Select Vehicle</p>
+                        <p class="text-[10px] text-white/40 uppercase mt-1">Select Vehicle</p>
                     </div>
                  \`;
                  container.appendChild(card);
@@ -243,6 +264,15 @@ export const Motorcade = () => {
              document.getElementById('detail-desc').innerText = car.desc;
              document.getElementById('detail-img-placeholder').innerText = car.img;
 
+             // Handle Amount Selector Visibility
+             const amountContainer = document.getElementById('amount-selector-container');
+             if (car.id !== 'none' && (currentRole === 'SWEEPER' || currentRole === 'PRINCIPAL')) {
+                 amountContainer.classList.remove('hidden');
+             } else {
+                 amountContainer.classList.add('hidden');
+             }
+             updateAmountUI();
+
              // Update Specs (Internal)
              document.getElementById('spec-armor').innerText = car.specs.armor;
              document.getElementById('spec-payload').innerText = car.specs.payload;
@@ -252,6 +282,25 @@ export const Motorcade = () => {
              // Reset Specs visibility
              document.getElementById('specs-list').classList.add('hidden');
              document.getElementById('specs-btn-icon').innerText = "[+]";
+         }
+
+         window.changeAmount = (delta) => {
+             const newAmount = vehicleAmount + delta;
+             if (newAmount >= 1 && newAmount <= 3) {
+                 vehicleAmount = newAmount;
+                 updateAmountUI();
+             }
+         }
+
+         window.updateAmountUI = () => {
+             const el = document.getElementById('vehicle-amount');
+             const desc = document.getElementById('formation-desc');
+             if (el) el.innerText = vehicleAmount;
+             if (desc) {
+                 if (vehicleAmount === 1) desc.innerText = "Single Unit";
+                 else if (vehicleAmount === 2) desc.innerText = "Side-by-Side";
+                 else if (vehicleAmount === 3) desc.innerText = "Triangular Formation";
+             }
          }
 
          window.toggleSpecs = () => {
@@ -275,7 +324,7 @@ export const Motorcade = () => {
 
          window.deployAsset = () => {
              if(currentSlotId !== null && selectedVehicle && window.Sentinel) {
-                 window.Sentinel.spawnVehicle(currentSlotId, selectedVehicle.id);
+                 window.Sentinel.spawnVehicle(currentSlotId, selectedVehicle.id, vehicleAmount);
                  toggleGarage(false);
              }
          }
