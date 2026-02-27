@@ -10,10 +10,15 @@ export class SceneManager {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls | null = null;
-  private videoTexture: THREE.VideoTexture | null = null;
-  private videoElement: HTMLVideoElement | null = null;
   private bgMesh: THREE.Mesh | null = null;
   private currentTheme: string = "";
+
+  // Video Cache: one HTMLVideoElement + VideoTexture per video path (never mutate src)
+  private videoCache: Map<
+    string,
+    { video: HTMLVideoElement; texture: THREE.VideoTexture }
+  > = new Map();
+  private activeVideoPath: string | null = null;
 
   // Configuration: Map IDs to file paths
   private readonly VIDEO_MAP: Record<string, string> = {
@@ -30,19 +35,23 @@ export class SceneManager {
   private gltfloader: GLTFLoader;
   private targetPositions: THREE.Vector3[] = [];
 
+  // Asset Cache (Promise-based to prevent concurrent duplicate loads)
+  private modelCache: Map<string, Promise<THREE.Group>> = new Map();
+
   // 3D Motorcade Props
   private slotGroup: THREE.Group = new THREE.Group();
   private loadedVehicles: Map<number, THREE.Group> = new Map();
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
+  private resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly TIER_CONFIG: Record<string, any[]> = {
     Vanguard: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff }, // Cyan
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },    // Gray
+      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 }, // Gray
       { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 }, // Gold
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },   // Red
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },   // Blue
+      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 }, // Red
+      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff }, // Blue
     ],
     Sentinel: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
@@ -89,7 +98,11 @@ export class SceneManager {
     );
     this.camera.position.z = 8;
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -113,14 +126,14 @@ export class SceneManager {
 
     // Zooming also stops transitions
     window.addEventListener("wheel", () => {
-        this.isTransitioning = false;
+      this.isTransitioning = false;
     });
 
     // Ground Plane for Motorcade Lighting
     const groundGeo = new THREE.PlaneGeometry(500, 500);
-    const groundMat = new THREE.MeshStandardMaterial({ 
+    const groundMat = new THREE.MeshStandardMaterial({
       color: 0x151515, // Mid-gray for visibility
-      roughness: 0.6,  // High roughness to catch light spread
+      roughness: 0.6, // High roughness to catch light spread
       metalness: 0.1,
     });
     this.groundPlane = new THREE.Mesh(groundGeo, groundMat);
@@ -140,12 +153,12 @@ export class SceneManager {
     // --- Ultra-Bright Cinematic Lighting ---
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambientLight);
-    
+
     const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
     mainLight.position.set(20, 50, 20);
     mainLight.castShadow = true;
     this.scene.add(mainLight);
-    
+
     // Group Formation
     this.formationGroup = new THREE.Group();
     this.scene.add(this.formationGroup);
@@ -159,7 +172,7 @@ export class SceneManager {
     this.preloadPrincipal();
 
     window.addEventListener("resize", this.onWindowResize.bind(this));
-    
+
     // Bind and add click handler once
     this.boundOnMouseClick = this.onMouseClick.bind(this);
     window.addEventListener("click", this.boundOnMouseClick);
@@ -185,7 +198,7 @@ export class SceneManager {
       0,
       size / 2,
       size / 2,
-      size / 2
+      size / 2,
     );
 
     gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
@@ -232,14 +245,14 @@ export class SceneManager {
     console.log(`Sentinel: Updating Formation to ${count}`);
 
     this.isMotorcade = false;
-    this.skipFormationAnimation = false; 
-    if(this.controls) this.controls.enabled = false;
-    if(this.groundPlane) this.groundPlane.visible = false;
+    this.skipFormationAnimation = false;
+    if (this.controls) this.controls.enabled = false;
+    if (this.groundPlane) this.groundPlane.visible = false;
 
     this.camera.position.set(4, 5, 4);
     this.camera.lookAt(0, 0.5, 0);
     if (this.bgMesh) this.bgMesh.visible = false;
-    if (this.videoElement) this.videoElement.pause();
+    this.pauseAllVideos();
     this.formationGroup.visible = true;
     this.slotGroup.visible = false;
 
@@ -359,9 +372,12 @@ export class SceneManager {
   // }
 
   private onWindowResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (this.resizeTimer) clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(() => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }, 150);
   }
 
   private animate(): void {
@@ -397,7 +413,11 @@ export class SceneManager {
       });
     }
 
-    if (this.videoTexture) this.videoTexture.needsUpdate = true;
+    // Only update the actively playing video texture
+    if (this.activeVideoPath) {
+      const entry = this.videoCache.get(this.activeVideoPath);
+      if (entry) entry.texture.needsUpdate = true;
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -410,7 +430,7 @@ export class SceneManager {
 
     this.isMotorcade = false;
     this.skipFormationAnimation = false;
-    if(this.controls) this.controls.enabled = false;
+    if (this.controls) this.controls.enabled = false;
 
     if (themeId !== "black") {
       this.camera.position.set(0, 0, 8);
@@ -422,60 +442,93 @@ export class SceneManager {
 
     if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
       if (this.bgMesh) this.bgMesh.visible = false;
-      if (this.videoElement) {
-        this.videoElement.pause();
-        this.videoElement.style.display = "none";
-      }
+      this.pauseAllVideos();
+      this.activeVideoPath = null;
       this.currentTheme = "black";
       return;
     }
 
     const videoPath = this.VIDEO_MAP[themeId];
 
+    // Pause every cached video before switching
+    this.pauseAllVideos();
+
+    // Ensure the bg mesh exists (first call creates geometry + material)
     if (!this.bgMesh) {
-      this.createVideoPlane(videoPath);
-    } else {
-      this.bgMesh.visible = true;
+      this.initBgMesh();
     }
 
-    if (this.videoElement) {
-      this.videoElement.style.display = "block";
-      if (!this.videoElement.src.includes(videoPath)) {
-        this.videoElement.src = videoPath;
-      }
+    // Get or create the cached video+texture pair for this path
+    const entry = this.getOrCreateVideo(videoPath);
 
-      this.videoElement.loop = false;
-      this.videoElement.currentTime = 0;
-      this.videoElement.play();
-    }
+    // Swap the texture on the existing mesh material
+    const mat = this.bgMesh!.material as THREE.MeshBasicMaterial;
+    mat.map = entry.texture;
+    mat.needsUpdate = true;
+
+    this.bgMesh!.visible = true;
+    this.activeVideoPath = videoPath;
+
+    // Play from the start
+    entry.video.currentTime = 0;
+    entry.video.play();
     // this.currentTheme = themeId;
   }
 
-  private createVideoPlane(url: string): void {
-    this.videoElement = document.createElement("video");
-    this.videoElement.src = url;
-    this.videoElement.crossOrigin = "anonymous";
-    this.videoElement.loop = false;
-    this.videoElement.muted = true;
-    this.videoElement.playsInline = true;
-    this.videoElement.style.display = "none";
-    this.videoElement.play();
+  /**
+   * Pause every video in the cache and mark no active path.
+   * Prevents multiple videos from decoding frames simultaneously.
+   */
+  private pauseAllVideos(): void {
+    this.videoCache.forEach((entry) => {
+      entry.video.pause();
+    });
+    this.activeVideoPath = null;
+  }
 
-    this.videoTexture = new THREE.VideoTexture(this.videoElement);
-    this.videoTexture.colorSpace = THREE.SRGBColorSpace;
-    this.videoTexture.minFilter = THREE.LinearFilter;
-    this.videoTexture.magFilter = THREE.LinearFilter;
+  /**
+   * Retrieve a cached video+texture pair, or create one.
+   * Each video element's `src` is set exactly once — no mutation.
+   */
+  private getOrCreateVideo(url: string): {
+    video: HTMLVideoElement;
+    texture: THREE.VideoTexture;
+  } {
+    const cached = this.videoCache.get(url);
+    if (cached) return cached;
 
+    const video = document.createElement("video");
+    video.src = url;
+    video.crossOrigin = "anonymous";
+    video.loop = false;
+    video.muted = true;
+    video.playsInline = true;
+    video.style.display = "none";
+    // Preload metadata so the decoder is warm
+    video.preload = "auto";
+
+    const texture = new THREE.VideoTexture(video);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    const entry = { video, texture };
+    this.videoCache.set(url, entry);
+    return entry;
+  }
+
+  /**
+   * Create the background mesh plane (geometry + material) once.
+   * The texture will be swapped via material.map on each theme change.
+   */
+  private initBgMesh(): void {
     const geometry = new THREE.PlaneGeometry(32, 18);
     const material = new THREE.MeshBasicMaterial({
-      map: this.videoTexture,
       side: THREE.DoubleSide,
     });
 
     this.bgMesh = new THREE.Mesh(geometry, material);
     this.bgMesh.position.set(0, -2, -5);
-    // this.bgMesh.name = "BackgroundLayer";
-
     this.scene.add(this.bgMesh);
   }
 
@@ -483,26 +536,40 @@ export class SceneManager {
     console.log(`Sentinel: Initializing Motorcade for [${tier}]`);
 
     this.isMotorcade = true;
-    if(this.controls) {
-        this.controls.enabled = true;
-        this.controls.target.set(0, 0, 0);
-        this.controls.update();
+    if (this.controls) {
+      this.controls.enabled = true;
+      this.controls.target.set(0, 0, 0);
+      this.controls.update();
     }
-    if(this.groundPlane) this.groundPlane.visible = true;
+    if (this.groundPlane) this.groundPlane.visible = true;
 
-    // --- NUCLEAR CLEANUP ---
+    // --- NUCLEAR CLEANUP: Eradicate all ghost artifacts from previous steps ---
+    // Hide background video plane
     if (this.bgMesh) {
       this.bgMesh.visible = false;
     }
-    if (this.videoElement) {
-      this.videoElement.pause();
-      this.videoElement.style.display = "none";
-    }
 
+    // Pause all cached video elements
+    this.pauseAllVideos();
+
+    // Hide the entire formation group and all its children recursively
     this.formationGroup.visible = false;
+    this.formationGroup.traverse((child) => {
+      child.visible = false;
+    });
+
+    // Explicitly hide every principal instance and its descendant meshes
     this.principalInstances.forEach((p) => {
       p.visible = false;
+      p.traverse((child) => {
+        child.visible = false;
+      });
     });
+
+    // Hide the preloaded principal template if it exists
+    if (this.principalModel) {
+      this.principalModel.visible = false;
+    }
 
     // Horizontal Side View Camera (90 Degree Rotation)
     this.cameraTargetPos.set(25, 8, 0); // Side view
@@ -511,13 +578,13 @@ export class SceneManager {
     this.camera.lookAt(this.cameraLookAt);
 
     // Clear old SpotLights and Beams
-    this.motorcadeSpotLights.forEach(light => {
-        this.scene.remove(light);
-        this.scene.remove(light.target);
+    this.motorcadeSpotLights.forEach((light) => {
+      this.scene.remove(light);
+      this.scene.remove(light.target);
     });
-    this.motorcadeBeams.forEach(beam => this.scene.remove(beam));
-    this.motorcadeLightPools.forEach(pool => this.scene.remove(pool));
-    
+    this.motorcadeBeams.forEach((beam) => this.scene.remove(beam));
+    this.motorcadeLightPools.forEach((pool) => this.scene.remove(pool));
+
     this.motorcadeSpotLights = [];
     this.motorcadeBeams = [];
     this.motorcadeLightPools = [];
@@ -538,7 +605,7 @@ export class SceneManager {
     if (!config) return;
     config.forEach((slotData) => {
       this.createHolographicSlot(slotData);
-      
+
       // Individual SpotLight for each slot
       const spotLight = new THREE.SpotLight(0xffffff, 800);
       spotLight.position.set(slotData.x, 25, slotData.z);
@@ -548,19 +615,19 @@ export class SceneManager {
       spotLight.decay = 2;
       spotLight.distance = 50;
       spotLight.castShadow = true;
-      
+
       this.scene.add(spotLight);
       this.scene.add(spotLight.target);
       this.motorcadeSpotLights.push(spotLight);
 
       // Volumetric Beam Mesh
       const beamMat = new THREE.MeshBasicMaterial({
-          color: 0xffffff,
-          transparent: true,
-          opacity: 0.1,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       beam.position.set(slotData.x, 25, slotData.z);
@@ -569,11 +636,11 @@ export class SceneManager {
 
       // Radiant Light Pool (Plane on floor with gradient texture)
       const poolMat = new THREE.MeshBasicMaterial({
-          map: this.radiantTexture,
-          transparent: true,
-          opacity: 0.4,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false
+        map: this.radiantTexture,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
       const pool = new THREE.Mesh(poolGeo, poolMat);
       pool.position.set(slotData.x, 0.1, slotData.z);
@@ -595,19 +662,21 @@ export class SceneManager {
     this.isTransitioning = true;
 
     // DISABLE FREE MOVEMENT during vehicle selection
-    if(this.controls) this.controls.enabled = false;
+    if (this.controls) this.controls.enabled = false;
 
     // Dim other lights, brighten this one
     this.motorcadeSpotLights.forEach((light, index) => {
-        if (index === slotId) {
-            light.intensity = 2000;
-            (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.35;
-            (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 1.0;
-        } else {
-            light.intensity = 50;
-            (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.02;
-            (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 0.05;
-        }
+      const beam = this.motorcadeBeams[index];
+      const pool = this.motorcadeLightPools[index];
+      if (index === slotId) {
+        light.intensity = 2000;
+        if (beam) (beam.material as THREE.MeshBasicMaterial).opacity = 0.35;
+        if (pool) (pool.material as THREE.MeshBasicMaterial).opacity = 1.0;
+      } else {
+        light.intensity = 50;
+        if (beam) (beam.material as THREE.MeshBasicMaterial).opacity = 0.02;
+        if (pool) (pool.material as THREE.MeshBasicMaterial).opacity = 0.05;
+      }
     });
   }
 
@@ -617,16 +686,18 @@ export class SceneManager {
     this.isTransitioning = true;
 
     // RE-ENABLE FREE MOVEMENT when drawer is closed
-    if(this.controls) {
-        this.controls.enabled = true;
-        this.controls.update();
+    if (this.controls) {
+      this.controls.enabled = true;
+      this.controls.update();
     }
 
     // Reset all lights to normal intensity
     this.motorcadeSpotLights.forEach((light, index) => {
-        light.intensity = 800;
-        (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.1;
-        (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 0.4;
+      const beam = this.motorcadeBeams[index];
+      const pool = this.motorcadeLightPools[index];
+      light.intensity = 800;
+      if (beam) (beam.material as THREE.MeshBasicMaterial).opacity = 0.1;
+      if (pool) (pool.material as THREE.MeshBasicMaterial).opacity = 0.4;
     });
   }
 
@@ -658,8 +729,8 @@ export class SceneManager {
     if (!this.isMotorcade) return;
 
     // IGNORE CLICKS IF GARAGE DRAWER IS OPEN
-    const drawer = document.getElementById('garage-drawer');
-    if (drawer && !drawer.classList.contains('translate-x-full')) return;
+    const drawer = document.getElementById("garage-drawer");
+    if (drawer && !drawer.classList.contains("translate-x-full")) return;
 
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -688,15 +759,79 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Dispose all geometries and materials of a THREE.Object3D tree.
+   * Prevents GPU memory leaks when removing vehicles from the scene.
+   */
+  private disposeObject(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        mesh.geometry?.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => m.dispose());
+        } else if (mesh.material) {
+          mesh.material.dispose();
+        }
+      }
+    });
+  }
+
+  /**
+   * Load a model from disk once, cache the Promise, and return a clone.
+   *
+   * Uses a Promise-based cache (`Map<string, Promise<THREE.Group>>`) so that
+   * concurrent calls for the same path share a single GLTFLoader parse.
+   * This eliminates the race condition where N simultaneous `spawnVehicle`
+   * calls each trigger their own `.glb` decode on the main thread.
+   */
+  private getOrLoadModel(path: string): Promise<THREE.Group> {
+    const existing = this.modelCache.get(path);
+    if (existing) {
+      // Cache hit — await the (possibly still in-flight) load, then clone
+      return existing.then((original) => original.clone());
+    }
+
+    // Cache miss — create the Promise *synchronously* and store it immediately
+    // so that any subsequent call within the same tick receives the same Promise.
+    const loadPromise = new Promise<THREE.Group>((resolve, reject) => {
+      this.gltfloader.load(
+        path,
+        (gltf) => {
+          const original = gltf.scene;
+          original.traverse((node) => {
+            if ((node as THREE.Mesh).isMesh) {
+              node.castShadow = true;
+              node.receiveShadow = true;
+            }
+          });
+          resolve(original);
+        },
+        undefined,
+        (error) => {
+          // Evict failed entry so a retry can attempt to load again
+          this.modelCache.delete(path);
+          reject(error);
+        },
+      );
+    });
+
+    this.modelCache.set(path, loadPromise);
+    return loadPromise.then((original) => original.clone());
+  }
+
   public spawnVehicle(slotId: number, vehicleType: string, amount: number = 1) {
     // Find the slot position
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot) return;
 
-    // Remove existing vehicle in this slot if any
+    // Remove existing vehicle in this slot and free GPU memory
     if (this.loadedVehicles.has(slotId)) {
       const old = this.loadedVehicles.get(slotId);
-      if (old) this.scene.remove(old);
+      if (old) {
+        this.disposeObject(old);
+        this.scene.remove(old);
+      }
       this.loadedVehicles.delete(slotId);
     }
 
@@ -723,49 +858,51 @@ export class SceneManager {
     const offsets: THREE.Vector3[] = [];
 
     if (amount === 1) {
-        offsets.push(new THREE.Vector3(0, 0, 0));
+      offsets.push(new THREE.Vector3(0, 0, 0));
     } else if (amount === 2) {
-        // Side by Side (along X axis for a motorcade look)
-        offsets.push(new THREE.Vector3(-spacing/2, 0, 0));
-        offsets.push(new THREE.Vector3(spacing/2, 0, 0));
+      // Side by Side (along X axis for a motorcade look)
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, 0));
+      offsets.push(new THREE.Vector3(spacing / 2, 0, 0));
     } else if (amount === 3) {
-        // Triangular
-        offsets.push(new THREE.Vector3(0, 0, spacing/2)); // Front
-        offsets.push(new THREE.Vector3(-spacing/2, 0, -spacing/2)); // Back Left
-        offsets.push(new THREE.Vector3(spacing/2, 0, -spacing/2));  // Back Right
+      // Triangular
+      offsets.push(new THREE.Vector3(0, 0, spacing / 2)); // Front
+      offsets.push(new THREE.Vector3(-spacing / 2, 0, -spacing / 2)); // Back Left
+      offsets.push(new THREE.Vector3(spacing / 2, 0, -spacing / 2)); // Back Right
     }
 
     offsets.forEach((offset) => {
-        this.gltfloader.load(path, (gltf) => {
-            const vehicle = gltf.scene;
-            vehicle.position.copy(offset);
-            
-            // Rotation - Ford F150 is facing backwards, rotate 180 degrees
-            if (vehicleType === "F150") {
-              vehicle.rotation.y = Math.PI;
+      this.getOrLoadModel(path)
+        .then((vehicle) => {
+          vehicle.position.copy(offset);
+
+          if (vehicleType === "F150") {
+            vehicle.rotation.y = Math.PI;
+          } else {
+            vehicle.rotation.y = 0;
+          }
+
+          vehicle.scale.set(1, 1, 1);
+
+          // Animate In (Drop)
+          const initialY = 5;
+          vehicle.position.y += initialY;
+
+          group.add(vehicle);
+
+          const targetY = offset.y;
+          const drop = () => {
+            if (vehicle.position.y > targetY) {
+              vehicle.position.y -= 0.2;
+              requestAnimationFrame(drop);
             } else {
-              vehicle.rotation.y = 0; // Face forward
+              vehicle.position.y = targetY;
             }
-      
-            vehicle.scale.set(1, 1, 1);
-            
-            // Animate In (Drop)
-            const initialY = 5;
-            vehicle.position.y += initialY;
-            
-            group.add(vehicle);
-      
-            const targetY = offset.y;
-            const drop = () => {
-              if (vehicle.position.y > targetY) {
-                vehicle.position.y -= 0.2;
-                requestAnimationFrame(drop);
-              } else {
-                vehicle.position.y = targetY;
-              }
-            };
-            drop();
-          });
+          };
+          drop();
+        })
+        .catch((err) =>
+          console.error(`Sentinel: Failed to load ${vehicleType}`, err),
+        );
     });
   }
 }

@@ -24,7 +24,7 @@ export const DressCode = () => {
         <div class="absolute inset-0 flex items-center justify-center gap-[45vw] z-40 pointer-events-none">
           {/* Left Arrow */}
           <button
-            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm"
+            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform"
             onclick="cycleDressCode(-1)"
           >
             <svg
@@ -41,7 +41,7 @@ export const DressCode = () => {
 
           {/* Right Arrow */}
           <button
-            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm"
+            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform"
             onclick="cycleDressCode(1)"
           >
             <svg
@@ -103,7 +103,7 @@ export const DressCode = () => {
         {/* Info Card */}
         <div
           id="info-card-container"
-          class="absolute bottom-[8vh] w-full flex justify-center z-40 pointer-events-none transition-all duration-500 ease-in-out opacity-100 translate-y-0"
+          class="absolute bottom-[8vh] w-full flex justify-center z-40 pointer-events-none transition-all duration-500 ease-in-out opacity-100 translate-y-0 will-change-[transform,opacity]"
         >
           <div class="glass-panel pointer-events-auto backdrop-blur-xl bg-black/60 border border-white/20 rounded-[2rem] w-[35vw] max-w-3xl flex flex-col p-8 shadow-2xl">
             <h3
@@ -122,7 +122,7 @@ export const DressCode = () => {
             </div>
 
             <button
-              class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+              class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)] will-change-transform"
               hx-get="/step/4"
               hx-target="#ui-layer"
             >

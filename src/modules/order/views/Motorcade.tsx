@@ -65,10 +65,10 @@ export const Motorcade = () => {
         </div>
       </div>
 
-      {/* Garage Drawer - Now a Right Side Panel */}
+      {/* Garage Drawer - Right Side Panel */}
       <div
         id="garage-drawer"
-        class="fixed top-0 right-0 h-full w-[450px] bg-black/95 border-l border-white/20 transform translate-x-full transition-transform duration-300 pointer-events-auto z-50 overflow-y-auto"
+        class="fixed top-0 right-0 h-full w-[450px] bg-black/95 border-l border-white/20 transform translate-x-full transition-transform duration-300 pointer-events-auto z-[60] overflow-y-auto will-change-transform"
       >
         <div class="p-8 h-full flex flex-col">
           <div class="flex justify-between items-center mb-8">
@@ -173,58 +173,103 @@ export const Motorcade = () => {
                 Specifications
               </button>
 
-                              {/* Specs List (Hidden by default) */}
-                              <div id="specs-list" class="hidden space-y-4 mb-8 border-t border-white/5 pt-4">
-                                  <div class="grid grid-cols-2 gap-4">
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Armor Class</span>
-                                          <span id="spec-armor" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Protection Grade</span>
-                                          <span id="spec-protection" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Horsepower</span>
-                                          <span id="spec-hp" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Torque</span>
-                                          <span id="spec-torque" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Max Speed</span>
-                                          <span id="spec-speed" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                      <div class="border-l-2 border-white/30 pl-4 py-1">
-                                          <span class="block text-[10px] text-gray-500 uppercase tracking-widest">Occupancy</span>
-                                          <span id="spec-occupancy" class="text-white font-bold uppercase text-sm">--</span>
-                                      </div>
-                                  </div>
-                              </div>
-                           </div>
-                           
-                           <div class="pt-6 border-t border-white/10 mt-auto flex flex-col gap-3 shrink-0">
-                              <button 
-                                  onclick="deployAsset()"
-                                  class="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
-                              >
-                                  Deploy Vehicle
-                              </button>
-                              <button 
-                                  onclick="backToGarage()"
-                                  class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-colors"
-                              >
-                                  [ Back to Selection ]
-                              </button>
-                           </div>
-                        </div>
-                      </div>
-                    </div>
-              
-                    {/* SCRIPT */}
-                    <script>
-                      {`
+              {/* Specs List (Hidden by default) */}
+              <div
+                id="specs-list"
+                class="hidden space-y-4 mb-8 border-t border-white/5 pt-4"
+              >
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Armor Class
+                    </span>
+                    <span
+                      id="spec-armor"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Protection Grade
+                    </span>
+                    <span
+                      id="spec-protection"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Horsepower
+                    </span>
+                    <span
+                      id="spec-hp"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Torque
+                    </span>
+                    <span
+                      id="spec-torque"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Max Speed
+                    </span>
+                    <span
+                      id="spec-speed"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                  <div class="border-l-2 border-white/30 pl-4 py-1">
+                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
+                      Occupancy
+                    </span>
+                    <span
+                      id="spec-occupancy"
+                      class="text-white font-bold uppercase text-sm"
+                    >
+                      --
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-white/10 mt-auto flex flex-col gap-3 shrink-0">
+              <button
+                onclick="deployAsset()"
+                class="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
+              >
+                Deploy Vehicle
+              </button>
+              <button
+                onclick="backToGarage()"
+                class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-colors"
+              >
+                [ Back to Selection ]
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SCRIPT */}
+      <script>
+        {`
                        let currentSlotId = null;
                        let currentRole = null;
                        let selectedVehicle = null;

@@ -30607,10 +30607,10 @@ class SceneManager {
   camera;
   renderer;
   controls = null;
-  videoTexture = null;
-  videoElement = null;
   bgMesh = null;
   currentTheme = "";
+  videoCache = new Map;
+  activeVideoPath = null;
   VIDEO_MAP = {
     business_formal: "/public/assets/videos/business_formal.mp4",
     casual_formal: "/public/assets/videos/business_casual.mp4",
@@ -30622,10 +30622,12 @@ class SceneManager {
   formationGroup;
   gltfloader;
   targetPositions = [];
+  modelCache = new Map;
   slotGroup = new Group;
   loadedVehicles = new Map;
   raycaster = new Raycaster;
   mouse = new Vector2;
+  resizeTimer = null;
   TIER_CONFIG = {
     Vanguard: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
@@ -30668,7 +30670,11 @@ class SceneManager {
     this.scene.background = new Color(657930);
     this.camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 8;
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer = new WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance"
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.toneMapping = ACESFilmicToneMapping;
@@ -30774,8 +30780,7 @@ class SceneManager {
     this.camera.lookAt(0, 0.5, 0);
     if (this.bgMesh)
       this.bgMesh.visible = false;
-    if (this.videoElement)
-      this.videoElement.pause();
+    this.pauseAllVideos();
     this.formationGroup.visible = true;
     this.slotGroup.visible = false;
     if (!this.principalModel) {
@@ -30850,9 +30855,13 @@ class SceneManager {
     });
   }
   onWindowResize() {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    if (this.resizeTimer)
+      clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(() => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }, 150);
   }
   animate() {
     requestAnimationFrame(this.animate.bind(this));
@@ -30879,8 +30888,11 @@ class SceneManager {
         model.lookAt(-10, 0, 0);
       });
     }
-    if (this.videoTexture)
-      this.videoTexture.needsUpdate = true;
+    if (this.activeVideoPath) {
+      const entry = this.videoCache.get(this.activeVideoPath);
+      if (entry)
+        entry.texture.needsUpdate = true;
+    }
     this.renderer.render(this.scene, this.camera);
   }
   changeBackground(themeId) {
@@ -30899,45 +30911,54 @@ class SceneManager {
     if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
       if (this.bgMesh)
         this.bgMesh.visible = false;
-      if (this.videoElement) {
-        this.videoElement.pause();
-        this.videoElement.style.display = "none";
-      }
+      this.pauseAllVideos();
+      this.activeVideoPath = null;
       this.currentTheme = "black";
       return;
     }
     const videoPath = this.VIDEO_MAP[themeId];
+    this.pauseAllVideos();
     if (!this.bgMesh) {
-      this.createVideoPlane(videoPath);
-    } else {
-      this.bgMesh.visible = true;
+      this.initBgMesh();
     }
-    if (this.videoElement) {
-      this.videoElement.style.display = "block";
-      if (!this.videoElement.src.includes(videoPath)) {
-        this.videoElement.src = videoPath;
-      }
-      this.videoElement.loop = false;
-      this.videoElement.currentTime = 0;
-      this.videoElement.play();
-    }
+    const entry = this.getOrCreateVideo(videoPath);
+    const mat = this.bgMesh.material;
+    mat.map = entry.texture;
+    mat.needsUpdate = true;
+    this.bgMesh.visible = true;
+    this.activeVideoPath = videoPath;
+    entry.video.currentTime = 0;
+    entry.video.play();
   }
-  createVideoPlane(url) {
-    this.videoElement = document.createElement("video");
-    this.videoElement.src = url;
-    this.videoElement.crossOrigin = "anonymous";
-    this.videoElement.loop = false;
-    this.videoElement.muted = true;
-    this.videoElement.playsInline = true;
-    this.videoElement.style.display = "none";
-    this.videoElement.play();
-    this.videoTexture = new VideoTexture(this.videoElement);
-    this.videoTexture.colorSpace = SRGBColorSpace;
-    this.videoTexture.minFilter = LinearFilter;
-    this.videoTexture.magFilter = LinearFilter;
+  pauseAllVideos() {
+    this.videoCache.forEach((entry) => {
+      entry.video.pause();
+    });
+    this.activeVideoPath = null;
+  }
+  getOrCreateVideo(url) {
+    const cached = this.videoCache.get(url);
+    if (cached)
+      return cached;
+    const video = document.createElement("video");
+    video.src = url;
+    video.crossOrigin = "anonymous";
+    video.loop = false;
+    video.muted = true;
+    video.playsInline = true;
+    video.style.display = "none";
+    video.preload = "auto";
+    const texture = new VideoTexture(video);
+    texture.colorSpace = SRGBColorSpace;
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    const entry = { video, texture };
+    this.videoCache.set(url, entry);
+    return entry;
+  }
+  initBgMesh() {
     const geometry = new PlaneGeometry(32, 18);
     const material = new MeshBasicMaterial({
-      map: this.videoTexture,
       side: DoubleSide
     });
     this.bgMesh = new Mesh(geometry, material);
@@ -30957,14 +30978,20 @@ class SceneManager {
     if (this.bgMesh) {
       this.bgMesh.visible = false;
     }
-    if (this.videoElement) {
-      this.videoElement.pause();
-      this.videoElement.style.display = "none";
-    }
+    this.pauseAllVideos();
     this.formationGroup.visible = false;
+    this.formationGroup.traverse((child) => {
+      child.visible = false;
+    });
     this.principalInstances.forEach((p) => {
       p.visible = false;
+      p.traverse((child) => {
+        child.visible = false;
+      });
     });
+    if (this.principalModel) {
+      this.principalModel.visible = false;
+    }
     this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
@@ -31038,14 +31065,20 @@ class SceneManager {
     if (this.controls)
       this.controls.enabled = false;
     this.motorcadeSpotLights.forEach((light, index) => {
+      const beam = this.motorcadeBeams[index];
+      const pool = this.motorcadeLightPools[index];
       if (index === slotId) {
         light.intensity = 2000;
-        this.motorcadeBeams[index].material.opacity = 0.35;
-        this.motorcadeLightPools[index].material.opacity = 1;
+        if (beam)
+          beam.material.opacity = 0.35;
+        if (pool)
+          pool.material.opacity = 1;
       } else {
         light.intensity = 50;
-        this.motorcadeBeams[index].material.opacity = 0.02;
-        this.motorcadeLightPools[index].material.opacity = 0.05;
+        if (beam)
+          beam.material.opacity = 0.02;
+        if (pool)
+          pool.material.opacity = 0.05;
       }
     });
   }
@@ -31058,9 +31091,13 @@ class SceneManager {
       this.controls.update();
     }
     this.motorcadeSpotLights.forEach((light, index) => {
+      const beam = this.motorcadeBeams[index];
+      const pool = this.motorcadeLightPools[index];
       light.intensity = 800;
-      this.motorcadeBeams[index].material.opacity = 0.1;
-      this.motorcadeLightPools[index].material.opacity = 0.4;
+      if (beam)
+        beam.material.opacity = 0.1;
+      if (pool)
+        pool.material.opacity = 0.4;
     });
   }
   createHolographicSlot(data) {
@@ -31102,14 +31139,52 @@ class SceneManager {
       }
     }
   }
+  disposeObject(obj) {
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        const mesh = child;
+        mesh.geometry?.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => m.dispose());
+        } else if (mesh.material) {
+          mesh.material.dispose();
+        }
+      }
+    });
+  }
+  getOrLoadModel(path) {
+    const existing = this.modelCache.get(path);
+    if (existing) {
+      return existing.then((original) => original.clone());
+    }
+    const loadPromise = new Promise((resolve, reject) => {
+      this.gltfloader.load(path, (gltf) => {
+        const original = gltf.scene;
+        original.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+        resolve(original);
+      }, undefined, (error2) => {
+        this.modelCache.delete(path);
+        reject(error2);
+      });
+    });
+    this.modelCache.set(path, loadPromise);
+    return loadPromise.then((original) => original.clone());
+  }
   spawnVehicle(slotId, vehicleType, amount = 1) {
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot)
       return;
     if (this.loadedVehicles.has(slotId)) {
       const old = this.loadedVehicles.get(slotId);
-      if (old)
+      if (old) {
+        this.disposeObject(old);
         this.scene.remove(old);
+      }
       this.loadedVehicles.delete(slotId);
     }
     if (vehicleType === "none")
@@ -31141,8 +31216,7 @@ class SceneManager {
       offsets.push(new Vector3(spacing / 2, 0, -spacing / 2));
     }
     offsets.forEach((offset) => {
-      this.gltfloader.load(path, (gltf) => {
-        const vehicle = gltf.scene;
+      this.getOrLoadModel(path).then((vehicle) => {
         vehicle.position.copy(offset);
         if (vehicleType === "F150") {
           vehicle.rotation.y = Math.PI;
@@ -31163,7 +31237,7 @@ class SceneManager {
           }
         };
         drop();
-      });
+      }).catch((err) => console.error(`Sentinel: Failed to load ${vehicleType}`, err));
     });
   }
 }
