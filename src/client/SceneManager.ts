@@ -63,8 +63,11 @@ export class SceneManager {
   // Camera Lerping
   private cameraTargetPos: THREE.Vector3 = new THREE.Vector3(0, 8, 12);
   private cameraLookAt: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
-  private motorcadeSpotLight: THREE.SpotLight | null = null;
+  private motorcadeSpotLights: THREE.SpotLight[] = [];
+  private motorcadeBeams: THREE.Mesh[] = [];
+  private motorcadeLightPools: THREE.Mesh[] = [];
   private groundPlane: THREE.Mesh | null = null;
+  private radiantTexture: THREE.CanvasTexture | null = null;
   private isMotorcade: boolean = false;
   private skipFormationAnimation: boolean = false;
   private isTransitioning: boolean = false;
@@ -76,7 +79,7 @@ export class SceneManager {
 
     this.scene = new THREE.Scene();
 
-    this.scene.background = new THREE.Color(0x050505);
+    this.scene.background = new THREE.Color(0x0a0a0a);
 
     this.camera = new THREE.PerspectiveCamera(
       75,
@@ -93,12 +96,14 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // ATTACH CONTROLS TO BODY: This fixes the 'unable to move freely' issue
+    // because the UI layers on top were intercepting mouse events.
+    this.controls = new OrbitControls(this.camera, document.body);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
-    this.controls.maxDistance = 80;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent going below floor
+    this.controls.maxDistance = 120;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
     this.controls.enabled = false;
 
     // Handle manual interaction to stop transitions
@@ -107,16 +112,16 @@ export class SceneManager {
     });
 
     // Zooming also stops transitions
-    this.renderer.domElement.addEventListener("wheel", () => {
+    window.addEventListener("wheel", () => {
         this.isTransitioning = false;
     });
 
     // Ground Plane for Motorcade Lighting
-    const groundGeo = new THREE.PlaneGeometry(200, 200);
+    const groundGeo = new THREE.PlaneGeometry(500, 500);
     const groundMat = new THREE.MeshStandardMaterial({ 
-      color: 0x444444,
-      roughness: 0.8,
-      metalness: 0.1
+      color: 0x151515, // Mid-gray for visibility
+      roughness: 0.6,  // High roughness to catch light spread
+      metalness: 0.1,
     });
     this.groundPlane = new THREE.Mesh(groundGeo, groundMat);
     this.groundPlane.rotation.x = -Math.PI / 2;
@@ -125,20 +130,22 @@ export class SceneManager {
     this.groundPlane.visible = false;
     this.scene.add(this.groundPlane);
 
-    // const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    // this.scene.add(ambientLight);
+    // Tactical Grid
+    const grid = new THREE.GridHelper(500, 100, 0xffffff, 0x222222);
+    grid.position.y = -0.02;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.1;
+    this.groundPlane.add(grid);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    // --- Ultra-Bright Cinematic Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
-    dirLight.position.set(5, 10, 7);
-    dirLight.castShadow = true;
-    this.scene.add(dirLight);
-    const rimLight = new THREE.SpotLight(0xffffff, 4.0);
-    rimLight.position.set(-5, 5, -5);
-    rimLight.lookAt(0, 0, 0);
-    this.scene.add(rimLight);
-
+    
+    const mainLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    mainLight.position.set(20, 50, 20);
+    mainLight.castShadow = true;
+    this.scene.add(mainLight);
+    
     // Group Formation
     this.formationGroup = new THREE.Group();
     this.scene.add(this.formationGroup);
@@ -162,6 +169,34 @@ export class SceneManager {
     (window as any).Sentinel = this;
 
     console.log("Sentinel SceneManager: Initialized");
+  }
+
+  private createRadiantTexture() {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    const gradient = context.createRadialGradient(
+      size / 2,
+      size / 2,
+      0,
+      size / 2,
+      size / 2,
+      size / 2
+    );
+
+    gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+    gradient.addColorStop(0.8, "rgba(255, 255, 255, 1)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
   }
 
   public static getInstance(): SceneManager {
@@ -333,7 +368,7 @@ export class SceneManager {
     requestAnimationFrame(this.animate.bind(this));
 
     if (this.isMotorcade) {
-      if (this.controls && this.controls.enabled) {
+      if (this.controls) {
         if (this.isTransitioning) {
           this.camera.position.lerp(this.cameraTargetPos, 0.08);
           this.controls.target.lerp(this.cameraLookAt, 0.08);
@@ -345,7 +380,7 @@ export class SceneManager {
             this.isTransitioning = false;
           }
         }
-        this.controls.update();
+        if (this.controls.enabled) this.controls.update();
       }
     }
 
@@ -475,31 +510,76 @@ export class SceneManager {
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
 
-    // Stage Light (SpotLight) - Bright top-down conelight
-    if (!this.motorcadeSpotLight) {
-      this.motorcadeSpotLight = new THREE.SpotLight(0xffffff, 5000);
-      this.motorcadeSpotLight.angle = Math.PI / 8;
-      this.motorcadeSpotLight.penumbra = 0.4;
-      this.motorcadeSpotLight.decay = 2;
-      this.motorcadeSpotLight.distance = 150;
-      this.motorcadeSpotLight.castShadow = true;
-      this.scene.add(this.motorcadeSpotLight);
-      this.scene.add(this.motorcadeSpotLight.target);
-    }
-    this.motorcadeSpotLight.position.set(0, 40, 0);
-    this.motorcadeSpotLight.target.position.set(0, 0, 0);
-    this.motorcadeSpotLight.visible = true;
-
-    // -----------------------
+    // Clear old SpotLights and Beams
+    this.motorcadeSpotLights.forEach(light => {
+        this.scene.remove(light);
+        this.scene.remove(light.target);
+    });
+    this.motorcadeBeams.forEach(beam => this.scene.remove(beam));
+    this.motorcadeLightPools.forEach(pool => this.scene.remove(pool));
+    
+    this.motorcadeSpotLights = [];
+    this.motorcadeBeams = [];
+    this.motorcadeLightPools = [];
 
     this.slotGroup.clear();
     this.scene.add(this.slotGroup);
 
     const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
 
+    // Volumetric Beam Geometry & Material
+    const beamGeo = new THREE.CylinderGeometry(0.1, 4.5, 25, 32, 1, true);
+    beamGeo.translate(0, -12.5, 0); // Origin at top
+
+    // Light Pool Geometry (Circle on floor)
+    const poolGeo = new THREE.PlaneGeometry(9, 9);
+    if (!this.radiantTexture) this.radiantTexture = this.createRadiantTexture();
+
     if (!config) return;
     config.forEach((slotData) => {
       this.createHolographicSlot(slotData);
+      
+      // Individual SpotLight for each slot
+      const spotLight = new THREE.SpotLight(0xffffff, 800);
+      spotLight.position.set(slotData.x, 25, slotData.z);
+      spotLight.target.position.set(slotData.x, 0, slotData.z);
+      spotLight.angle = Math.PI / 10;
+      spotLight.penumbra = 0.6;
+      spotLight.decay = 2;
+      spotLight.distance = 50;
+      spotLight.castShadow = true;
+      
+      this.scene.add(spotLight);
+      this.scene.add(spotLight.target);
+      this.motorcadeSpotLights.push(spotLight);
+
+      // Volumetric Beam Mesh
+      const beamMat = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.1,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+      });
+      const beam = new THREE.Mesh(beamGeo, beamMat);
+      beam.position.set(slotData.x, 25, slotData.z);
+      this.scene.add(beam);
+      this.motorcadeBeams.push(beam);
+
+      // Radiant Light Pool (Plane on floor with gradient texture)
+      const poolMat = new THREE.MeshBasicMaterial({
+          map: this.radiantTexture,
+          transparent: true,
+          opacity: 0.4,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+      });
+      const pool = new THREE.Mesh(poolGeo, poolMat);
+      pool.position.set(slotData.x, 0.1, slotData.z);
+      pool.rotation.x = -Math.PI / 2;
+      this.scene.add(pool);
+      this.motorcadeLightPools.push(pool);
     });
 
     this.slotGroup.visible = true;
@@ -514,10 +594,21 @@ export class SceneManager {
     this.cameraLookAt.set(0, 0, slot.position.z);
     this.isTransitioning = true;
 
-    if (this.motorcadeSpotLight) {
-      this.motorcadeSpotLight.position.set(slot.position.x, 40, slot.position.z);
-      this.motorcadeSpotLight.target.position.set(slot.position.x, 0, slot.position.z);
-    }
+    // DISABLE FREE MOVEMENT during vehicle selection
+    if(this.controls) this.controls.enabled = false;
+
+    // Dim other lights, brighten this one
+    this.motorcadeSpotLights.forEach((light, index) => {
+        if (index === slotId) {
+            light.intensity = 2000;
+            (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.35;
+            (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 1.0;
+        } else {
+            light.intensity = 50;
+            (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.02;
+            (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 0.05;
+        }
+    });
   }
 
   public resetMotorcadeCamera() {
@@ -525,10 +616,18 @@ export class SceneManager {
     this.cameraLookAt.set(0, 0, 0);
     this.isTransitioning = true;
 
-    if (this.motorcadeSpotLight) {
-      this.motorcadeSpotLight.position.set(0, 40, 0);
-      this.motorcadeSpotLight.target.position.set(0, 0, 0);
+    // RE-ENABLE FREE MOVEMENT when drawer is closed
+    if(this.controls) {
+        this.controls.enabled = true;
+        this.controls.update();
     }
+
+    // Reset all lights to normal intensity
+    this.motorcadeSpotLights.forEach((light, index) => {
+        light.intensity = 800;
+        (this.motorcadeBeams[index].material as THREE.MeshBasicMaterial).opacity = 0.1;
+        (this.motorcadeLightPools[index].material as THREE.MeshBasicMaterial).opacity = 0.4;
+    });
   }
 
   private createHolographicSlot(data: any) {

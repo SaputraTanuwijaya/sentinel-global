@@ -9257,6 +9257,14 @@ class VideoTexture extends Texture {
     super.dispose();
   }
 }
+class CanvasTexture extends Texture {
+  constructor(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
+    super(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
+    this.isCanvasTexture = true;
+    this.needsUpdate = true;
+  }
+}
+
 class DepthTexture extends Texture {
   constructor(width, height, type = UnsignedIntType, mapping, wrapS, wrapT, magFilter = NearestFilter, minFilter = NearestFilter, anisotropy, format = DepthFormat, depth = 1) {
     if (format !== DepthFormat && format !== DepthStencilFormat) {
@@ -12004,6 +12012,39 @@ class Spherical {
   }
   clone() {
     return new this.constructor().copy(this);
+  }
+}
+class GridHelper extends LineSegments {
+  constructor(size = 10, divisions = 10, color1 = 4473924, color2 = 8947848) {
+    color1 = new Color(color1);
+    color2 = new Color(color2);
+    const center = divisions / 2;
+    const step = size / divisions;
+    const halfSize = size / 2;
+    const vertices = [], colors = [];
+    for (let i = 0, j = 0, k = -halfSize;i <= divisions; i++, k += step) {
+      vertices.push(-halfSize, 0, k, halfSize, 0, k);
+      vertices.push(k, 0, -halfSize, k, 0, halfSize);
+      const color = i === center ? color1 : color2;
+      color.toArray(colors, j);
+      j += 3;
+      color.toArray(colors, j);
+      j += 3;
+      color.toArray(colors, j);
+      j += 3;
+      color.toArray(colors, j);
+      j += 3;
+    }
+    const geometry = new BufferGeometry;
+    geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+    const material = new LineBasicMaterial({ vertexColors: true, toneMapped: false });
+    super(geometry, material);
+    this.type = "GridHelper";
+  }
+  dispose() {
+    this.geometry.dispose();
+    this.material.dispose();
   }
 }
 class Controls extends EventDispatcher {
@@ -30610,8 +30651,11 @@ class SceneManager {
   };
   cameraTargetPos = new Vector3(0, 8, 12);
   cameraLookAt = new Vector3(0, 0, 0);
-  motorcadeSpotLight = null;
+  motorcadeSpotLights = [];
+  motorcadeBeams = [];
+  motorcadeLightPools = [];
   groundPlane = null;
+  radiantTexture = null;
   isMotorcade = false;
   skipFormationAnimation = false;
   isTransitioning = false;
@@ -30621,7 +30665,7 @@ class SceneManager {
     if (!this.container)
       throw new Error("Canvas container not found!");
     this.scene = new Scene;
-    this.scene.background = new Color(328965);
+    this.scene.background = new Color(657930);
     this.camera = new PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.z = 8;
     this.renderer = new WebGLRenderer({ antialias: true, alpha: true });
@@ -30630,23 +30674,23 @@ class SceneManager {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls = new OrbitControls(this.camera, document.body);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
-    this.controls.maxDistance = 80;
+    this.controls.maxDistance = 120;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
     this.controls.enabled = false;
     this.controls.addEventListener("start", () => {
       this.isTransitioning = false;
     });
-    this.renderer.domElement.addEventListener("wheel", () => {
+    window.addEventListener("wheel", () => {
       this.isTransitioning = false;
     });
-    const groundGeo = new PlaneGeometry(200, 200);
+    const groundGeo = new PlaneGeometry(500, 500);
     const groundMat = new MeshStandardMaterial({
-      color: 4473924,
-      roughness: 0.8,
+      color: 1381653,
+      roughness: 0.6,
       metalness: 0.1
     });
     this.groundPlane = new Mesh(groundGeo, groundMat);
@@ -30655,16 +30699,17 @@ class SceneManager {
     this.groundPlane.receiveShadow = true;
     this.groundPlane.visible = false;
     this.scene.add(this.groundPlane);
-    const ambientLight = new AmbientLight(16777215, 1.5);
+    const grid = new GridHelper(500, 100, 16777215, 2236962);
+    grid.position.y = -0.02;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.1;
+    this.groundPlane.add(grid);
+    const ambientLight = new AmbientLight(16777215, 1);
     this.scene.add(ambientLight);
-    const dirLight = new DirectionalLight(16777215, 3);
-    dirLight.position.set(5, 10, 7);
-    dirLight.castShadow = true;
-    this.scene.add(dirLight);
-    const rimLight = new SpotLight(16777215, 4);
-    rimLight.position.set(-5, 5, -5);
-    rimLight.lookAt(0, 0, 0);
-    this.scene.add(rimLight);
+    const mainLight = new DirectionalLight(16777215, 2.5);
+    mainLight.position.set(20, 50, 20);
+    mainLight.castShadow = true;
+    this.scene.add(mainLight);
     this.formationGroup = new Group;
     this.scene.add(this.formationGroup);
     const dracoLoader = new DRACOLoader;
@@ -30678,6 +30723,23 @@ class SceneManager {
     this.animate();
     window.Sentinel = this;
     console.log("Sentinel SceneManager: Initialized");
+  }
+  createRadiantTexture() {
+    const size = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext("2d");
+    if (!context)
+      return null;
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+    gradient.addColorStop(0.8, "rgba(255, 255, 255, 1)");
+    gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    const texture = new CanvasTexture(canvas);
+    return texture;
   }
   static getInstance() {
     if (!SceneManager.instance) {
@@ -30795,7 +30857,7 @@ class SceneManager {
   animate() {
     requestAnimationFrame(this.animate.bind(this));
     if (this.isMotorcade) {
-      if (this.controls && this.controls.enabled) {
+      if (this.controls) {
         if (this.isTransitioning) {
           this.camera.position.lerp(this.cameraTargetPos, 0.08);
           this.controls.target.lerp(this.cameraLookAt, 0.08);
@@ -30803,7 +30865,8 @@ class SceneManager {
             this.isTransitioning = false;
           }
         }
-        this.controls.update();
+        if (this.controls.enabled)
+          this.controls.update();
       }
     }
     if (this.formationGroup.visible) {
@@ -30906,26 +30969,62 @@ class SceneManager {
     this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
-    if (!this.motorcadeSpotLight) {
-      this.motorcadeSpotLight = new SpotLight(16777215, 5000);
-      this.motorcadeSpotLight.angle = Math.PI / 8;
-      this.motorcadeSpotLight.penumbra = 0.4;
-      this.motorcadeSpotLight.decay = 2;
-      this.motorcadeSpotLight.distance = 150;
-      this.motorcadeSpotLight.castShadow = true;
-      this.scene.add(this.motorcadeSpotLight);
-      this.scene.add(this.motorcadeSpotLight.target);
-    }
-    this.motorcadeSpotLight.position.set(0, 40, 0);
-    this.motorcadeSpotLight.target.position.set(0, 0, 0);
-    this.motorcadeSpotLight.visible = true;
+    this.motorcadeSpotLights.forEach((light) => {
+      this.scene.remove(light);
+      this.scene.remove(light.target);
+    });
+    this.motorcadeBeams.forEach((beam) => this.scene.remove(beam));
+    this.motorcadeLightPools.forEach((pool) => this.scene.remove(pool));
+    this.motorcadeSpotLights = [];
+    this.motorcadeBeams = [];
+    this.motorcadeLightPools = [];
     this.slotGroup.clear();
     this.scene.add(this.slotGroup);
     const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    const beamGeo = new CylinderGeometry(0.1, 4.5, 25, 32, 1, true);
+    beamGeo.translate(0, -12.5, 0);
+    const poolGeo = new PlaneGeometry(9, 9);
+    if (!this.radiantTexture)
+      this.radiantTexture = this.createRadiantTexture();
     if (!config)
       return;
     config.forEach((slotData) => {
       this.createHolographicSlot(slotData);
+      const spotLight = new SpotLight(16777215, 800);
+      spotLight.position.set(slotData.x, 25, slotData.z);
+      spotLight.target.position.set(slotData.x, 0, slotData.z);
+      spotLight.angle = Math.PI / 10;
+      spotLight.penumbra = 0.6;
+      spotLight.decay = 2;
+      spotLight.distance = 50;
+      spotLight.castShadow = true;
+      this.scene.add(spotLight);
+      this.scene.add(spotLight.target);
+      this.motorcadeSpotLights.push(spotLight);
+      const beamMat = new MeshBasicMaterial({
+        color: 16777215,
+        transparent: true,
+        opacity: 0.1,
+        side: DoubleSide,
+        blending: AdditiveBlending,
+        depthWrite: false
+      });
+      const beam = new Mesh(beamGeo, beamMat);
+      beam.position.set(slotData.x, 25, slotData.z);
+      this.scene.add(beam);
+      this.motorcadeBeams.push(beam);
+      const poolMat = new MeshBasicMaterial({
+        map: this.radiantTexture,
+        transparent: true,
+        opacity: 0.4,
+        blending: AdditiveBlending,
+        depthWrite: false
+      });
+      const pool = new Mesh(poolGeo, poolMat);
+      pool.position.set(slotData.x, 0.1, slotData.z);
+      pool.rotation.x = -Math.PI / 2;
+      this.scene.add(pool);
+      this.motorcadeLightPools.push(pool);
     });
     this.slotGroup.visible = true;
   }
@@ -30936,19 +31035,33 @@ class SceneManager {
     this.cameraTargetPos.set(12, 4, slot.position.z);
     this.cameraLookAt.set(0, 0, slot.position.z);
     this.isTransitioning = true;
-    if (this.motorcadeSpotLight) {
-      this.motorcadeSpotLight.position.set(slot.position.x, 40, slot.position.z);
-      this.motorcadeSpotLight.target.position.set(slot.position.x, 0, slot.position.z);
-    }
+    if (this.controls)
+      this.controls.enabled = false;
+    this.motorcadeSpotLights.forEach((light, index) => {
+      if (index === slotId) {
+        light.intensity = 2000;
+        this.motorcadeBeams[index].material.opacity = 0.35;
+        this.motorcadeLightPools[index].material.opacity = 1;
+      } else {
+        light.intensity = 50;
+        this.motorcadeBeams[index].material.opacity = 0.02;
+        this.motorcadeLightPools[index].material.opacity = 0.05;
+      }
+    });
   }
   resetMotorcadeCamera() {
     this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
     this.isTransitioning = true;
-    if (this.motorcadeSpotLight) {
-      this.motorcadeSpotLight.position.set(0, 40, 0);
-      this.motorcadeSpotLight.target.position.set(0, 0, 0);
+    if (this.controls) {
+      this.controls.enabled = true;
+      this.controls.update();
     }
+    this.motorcadeSpotLights.forEach((light, index) => {
+      light.intensity = 800;
+      this.motorcadeBeams[index].material.opacity = 0.1;
+      this.motorcadeLightPools[index].material.opacity = 0.4;
+    });
   }
   createHolographicSlot(data) {
     const geometry = new BoxGeometry(3.5, 0.1, 6);
