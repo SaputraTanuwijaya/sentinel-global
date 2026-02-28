@@ -267,6 +267,35 @@ export const Motorcade = () => {
         </div>
       </div>
 
+      {/* Persistent Proceed Button - Bottom Right */}
+      <div
+        id="proceed-btn-container"
+        class="fixed bottom-12 right-12 pointer-events-none z-[40] opacity-0 translate-y-10 transition-all duration-700"
+      >
+        <button
+          id="proceed-btn"
+          class="px-10 py-5 bg-white text-black font-bold uppercase tracking-[0.3em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center gap-6 group active:scale-[0.98]"
+          hx-get="/step/5"
+          hx-target="#ui-layer"
+        >
+          <span>Proceed to Rendezvous</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M17 8l4 4m0 0l-4 4m4-4H3"
+            />
+          </svg>
+        </button>
+      </div>
+
       {/* SCRIPT */}
       <script>
         {`
@@ -431,12 +460,39 @@ export const Motorcade = () => {
              document.getElementById('drawer-title').innerText = "Assign Vehicle:";
          }
 
+         const updateProceedButton = () => {
+             const btn = document.getElementById('proceed-btn-container');
+             if (!btn) return;
+
+             // Only show if Principal is assigned (id is NOT 'none')
+             const isPrincipalAssigned = window.MissionState && window.MissionState.principalAssigned;
+             
+             if (isPrincipalAssigned) {
+                 btn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+                 btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+             } else {
+                 btn.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+                 btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+             }
+         }
+
          window.deployAsset = () => {
              if(currentSlotId !== null && selectedVehicle && window.Sentinel) {
                  window.Sentinel.spawnVehicle(currentSlotId, selectedVehicle.id, vehicleAmount);
+                 
+                 // Track Principal assignment in MissionState
+                 if (currentRole === 'PRINCIPAL') {
+                    if (!window.MissionState) window.MissionState = {};
+                    window.MissionState.principalAssigned = (selectedVehicle.id !== 'none');
+                    updateProceedButton();
+                 }
+
                  toggleGarage(false);
              }
          }
+
+         // Initial Check
+         setTimeout(updateProceedButton, 500);
       `}
       </script>
     </div>
