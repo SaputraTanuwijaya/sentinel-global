@@ -330,6 +330,7 @@ export const Motorcade = () => {
                            ],
                            'SWEEPER': [
                                { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', img: 'Scout', specs: { armor: 'None', protection: 'None', hp: '205 HP', torque: '83 LB-FT', speed: '185 MPH', occ: '1' } },
+                               { id: 'Electra', name: 'Electra Glide Tactical', desc: 'Heavy Escort Cruiser. Optimized for motorcade stability, providing a high-visibility tactical presence.', img: 'Escort', specs: { armor: 'None', protection: 'None', hp: '105 HP', torque: '122 LB-FT', speed: '115 MPH', occ: '1' } },
                                { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'CAT': [

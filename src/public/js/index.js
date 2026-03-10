@@ -31194,7 +31194,8 @@ class SceneManager {
       G63: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
       Suburban: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
       F150: "/public/assets/models/FordF150_Optimized-v3.glb",
-      BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb"
+      BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb",
+      Electra: "/public/assets/models/Electra_Optimized-v1.glb"
     };
     const path = modelMap[vehicleType];
     if (!path)
@@ -31218,7 +31219,7 @@ class SceneManager {
     offsets.forEach((offset) => {
       this.getOrLoadModel(path).then((vehicle) => {
         vehicle.position.copy(offset);
-        if (vehicleType === "F150") {
+        if (vehicleType === "F150" || vehicleType === "Electra") {
           vehicle.rotation.y = Math.PI;
         } else {
           vehicle.rotation.y = 0;

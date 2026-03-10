@@ -844,6 +844,7 @@ export class SceneManager {
       Suburban: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
       F150: "/public/assets/models/FordF150_Optimized-v3.glb",
       BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb",
+      Electra: "/public/assets/models/Electra_Optimized-v1.glb",
     };
 
     const path = modelMap[vehicleType];
@@ -875,7 +876,7 @@ export class SceneManager {
         .then((vehicle) => {
           vehicle.position.copy(offset);
 
-          if (vehicleType === "F150") {
+          if (vehicleType === "F150" || vehicleType === "Electra") {
             vehicle.rotation.y = Math.PI;
           } else {
             vehicle.rotation.y = 0;
