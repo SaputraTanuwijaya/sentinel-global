@@ -30680,7 +30680,7 @@ class SceneManager {
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
-    this.controls = new OrbitControls(this.camera, document.body);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
@@ -30858,10 +30858,13 @@ class SceneManager {
     if (this.resizeTimer)
       clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.refresh();
     }, 150);
+  }
+  refresh() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
   animate() {
     requestAnimationFrame(this.animate.bind(this));
@@ -30901,6 +30904,17 @@ class SceneManager {
     this.skipFormationAnimation = false;
     if (this.controls)
       this.controls.enabled = false;
+    if (this.groundPlane)
+      this.groundPlane.visible = false;
+    this.slotGroup.visible = false;
+    this.motorcadeSpotLights.forEach((light) => {
+      light.visible = false;
+      if (light.target)
+        light.target.visible = false;
+    });
+    this.motorcadeBeams.forEach((beam) => beam.visible = false);
+    this.motorcadeLightPools.forEach((pool) => pool.visible = false);
+    this.loadedVehicles.forEach((v) => v.visible = false);
     if (themeId !== "black") {
       this.camera.position.set(0, 0, 8);
       this.camera.lookAt(0, 0, 0);
@@ -30925,10 +30939,11 @@ class SceneManager {
     const mat = this.bgMesh.material;
     mat.map = entry.texture;
     mat.needsUpdate = true;
+    this.bgMesh.position.set(0, -2, -5);
     this.bgMesh.visible = true;
     this.activeVideoPath = videoPath;
     entry.video.currentTime = 0;
-    entry.video.play();
+    entry.video.play().catch(() => {});
   }
   pauseAllVideos() {
     this.videoCache.forEach((entry) => {
@@ -30973,32 +30988,31 @@ class SceneManager {
       this.controls.target.set(0, 0, 0);
       this.controls.update();
     }
-    if (this.groundPlane)
-      this.groundPlane.visible = true;
     if (this.bgMesh) {
       this.bgMesh.visible = false;
+      this.bgMesh.position.set(0, -2, -5);
     }
     this.pauseAllVideos();
+    this.activeVideoPath = null;
+    if (this.groundPlane) {
+      this.groundPlane.visible = true;
+      this.groundPlane.position.y = -0.05;
+    }
     this.formationGroup.visible = false;
     this.formationGroup.traverse((child) => {
       child.visible = false;
     });
     this.principalInstances.forEach((p) => {
       p.visible = false;
-      p.traverse((child) => {
-        child.visible = false;
-      });
     });
-    if (this.principalModel) {
-      this.principalModel.visible = false;
-    }
     this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
     this.motorcadeSpotLights.forEach((light) => {
       this.scene.remove(light);
-      this.scene.remove(light.target);
+      if (light.target)
+        this.scene.remove(light.target);
     });
     this.motorcadeBeams.forEach((beam) => this.scene.remove(beam));
     this.motorcadeLightPools.forEach((pool) => this.scene.remove(pool));
@@ -31008,6 +31022,12 @@ class SceneManager {
     this.slotGroup.clear();
     this.scene.add(this.slotGroup);
     const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    this.loadedVehicles.forEach((v) => {
+      v.visible = true;
+      v.traverse((child) => {
+        child.visible = true;
+      });
+    });
     const beamGeo = new CylinderGeometry(0.1, 4.5, 25, 32, 1, true);
     beamGeo.translate(0, -12.5, 0);
     const poolGeo = new PlaneGeometry(9, 9);
@@ -31054,6 +31074,7 @@ class SceneManager {
       this.motorcadeLightPools.push(pool);
     });
     this.slotGroup.visible = true;
+    this.renderer.render(this.scene, this.camera);
   }
   focusOnSlot(slotId) {
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
@@ -31252,5 +31273,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (theme) {
       engine.changeBackground(theme);
     }
+  });
+  document.body.addEventListener("htmx:afterSettle", () => {
+    engine.refresh();
   });
 });

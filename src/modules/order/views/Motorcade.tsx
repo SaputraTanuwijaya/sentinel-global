@@ -4,10 +4,10 @@ export const Motorcade = () => {
   return (
     <div class="relative h-full w-full pointer-events-none z-50">
       {/* Header */}
-      <div class="absolute top-10 left-10 pointer-events-auto flex flex-col gap-8">
+      <div class="absolute top-10 left-10 pointer-events-auto flex flex-col gap-8 z-[70]">
         {/* Back Button Integrated */}
         <button
-          class="w-fit p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5"
+          class="w-fit p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto cursor-pointer"
           hx-get="/step/3"
           hx-target="#ui-layer"
         >
@@ -42,7 +42,7 @@ export const Motorcade = () => {
         {/* Camera Reset Button */}
         <button
           onclick="if(window.Sentinel) window.Sentinel.resetMotorcadeCamera()"
-          class="w-fit px-4 py-2 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/10 hover:border-white/30 transition-all flex items-center gap-2 group"
+          class="w-fit px-4 py-2 bg-white/5 border border-white/10 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/10 hover:border-white/30 transition-all flex items-center gap-2 group cursor-pointer pointer-events-auto"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -93,7 +93,7 @@ export const Motorcade = () => {
       {/* Garage Drawer - Right Side Panel */}
       <div
         id="garage-drawer"
-        class="fixed top-0 right-0 h-full w-[450px] bg-black/95 border-l border-white/20 transform translate-x-full transition-transform duration-300 pointer-events-auto z-[60] overflow-y-auto will-change-transform"
+        class="fixed top-0 right-0 h-full w-[450px] bg-black/95 border-l border-white/20 transform translate-x-full transition-transform duration-300 pointer-events-auto z-[80] overflow-y-auto will-change-transform"
       >
         <div class="p-8 h-full flex flex-col">
           <div class="flex justify-between items-center mb-8">
@@ -110,7 +110,7 @@ export const Motorcade = () => {
               </div>
             </div>
             <button
-              class="text-gray-400 hover:text-white uppercase tracking-widest text-xs border border-white/10 px-3 py-2 rounded hover:bg-white/5"
+              class="text-gray-400 hover:text-white uppercase tracking-widest text-xs border border-white/10 px-3 py-2 rounded hover:bg-white/5 cursor-pointer pointer-events-auto"
               onclick="toggleGarage(false)"
             >
               Close [X]
@@ -130,11 +130,11 @@ export const Motorcade = () => {
             <div class="h-48 bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-xl flex items-center justify-center relative overflow-hidden mb-6 shrink-0">
               <div
                 id="detail-img-placeholder"
-                class="text-6xl font-black text-white/5 uppercase select-none"
+                class="text-6xl font-black text-white/5 uppercase select-none w-full h-full flex items-center justify-center"
               >
                 Asset
               </div>
-              <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none"></div>
             </div>
 
             <div class="flex-grow">
@@ -163,7 +163,7 @@ export const Motorcade = () => {
                 <div class="flex items-center gap-4">
                   <button
                     onclick="changeAmount(-1)"
-                    class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                    class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors cursor-pointer pointer-events-auto"
                   >
                     -
                   </button>
@@ -175,7 +175,7 @@ export const Motorcade = () => {
                   </span>
                   <button
                     onclick="changeAmount(1)"
-                    class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                    class="w-10 h-10 border border-white/20 rounded-full flex items-center justify-center text-white hover:bg-white/10 transition-colors cursor-pointer pointer-events-auto"
                   >
                     +
                   </button>
@@ -192,7 +192,7 @@ export const Motorcade = () => {
               <button
                 id="specs-toggle-btn"
                 onclick="toggleSpecs()"
-                class="text-[10px] text-white font-bold uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors mb-4"
+                class="text-[10px] text-white font-bold uppercase tracking-[0.2em] flex items-center gap-2 hover:text-white transition-colors mb-4 cursor-pointer pointer-events-auto"
               >
                 <span id="specs-btn-icon">[+]</span> View Technical
                 Specifications
@@ -277,13 +277,13 @@ export const Motorcade = () => {
             <div class="pt-6 border-t border-white/10 mt-auto flex flex-col gap-3 shrink-0">
               <button
                 onclick="deployAsset()"
-                class="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
+                class="w-full py-4 bg-white text-black font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors cursor-pointer pointer-events-auto"
               >
                 Deploy Vehicle
               </button>
               <button
                 onclick="backToGarage()"
-                class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-colors"
+                class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest text-xs hover:bg-white/10 transition-colors cursor-pointer pointer-events-auto"
               >
                 [ Back to Selection ]
               </button>
@@ -299,7 +299,7 @@ export const Motorcade = () => {
       >
         <button
           id="proceed-btn"
-          class="px-10 py-5 bg-white text-black font-bold uppercase tracking-[0.3em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center gap-6 group active:scale-[0.98]"
+          class="px-10 py-5 bg-white text-black font-bold uppercase tracking-[0.3em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_30px_rgba(255,255,255,0.15)] flex items-center gap-6 group active:scale-[0.98] pointer-events-none cursor-pointer"
           hx-get="/step/5"
           hx-target="#ui-layer"
         >
@@ -368,8 +368,11 @@ export const Motorcade = () => {
                            ]
                        };
               
-                       // EVENT LISTENER
-                       document.body.addEventListener('sentinel-garage-open', (e) => {
+                       // EVENT LISTENER — Remove previous handler to prevent duplicates on HTMX re-entry
+                       if (window._garageOpenHandler) {
+                           document.body.removeEventListener('sentinel-garage-open', window._garageOpenHandler);
+                       }
+                       window._garageOpenHandler = (e) => {
                            const { slotId, role } = e.detail;
                            currentSlotId = slotId;
                            currentRole = role;
@@ -387,16 +390,16 @@ export const Motorcade = () => {
                            
                            options.forEach(car => {
                                const card = document.createElement('div');
-                               card.className = "w-full bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer hover:bg-white/10 hover:border-white/40 transition-all group flex items-center gap-4";
+                               card.className = "w-full bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer hover:bg-white/10 hover:border-white/40 transition-all group flex items-center gap-4 pointer-events-auto";
                                card.onclick = () => selectVehicle(car);
                                
                                const iconHtml = car.icon 
-                                 ? \`<img src="\${car.icon}" class="w-20 h-20 object-contain rounded-lg border border-white/10 group-hover:border-white/30 transition-all" />\`
-                                 : \`<div class="w-20 h-20 bg-gradient-to-br from-gray-800 to-black rounded-lg flex items-center justify-center text-gray-500 group-hover:text-white transition-colors shrink-0 text-[10px] uppercase font-bold text-center">Empty</div>\`;
+                                 ? \`<img src="\${car.icon}" class="w-20 h-20 object-contain rounded-lg border border-white/10 group-hover:border-white/30 transition-all pointer-events-none" />\`
+                                 : \`<div class="w-20 h-20 bg-gradient-to-br from-gray-800 to-black rounded-lg flex items-center justify-center text-gray-500 group-hover:text-white transition-colors shrink-0 text-[10px] uppercase font-bold text-center pointer-events-none">Empty</div>\`;
 
                                card.innerHTML = \`
                                   \${iconHtml}
-                                  <div>
+                                  <div class="pointer-events-none">
                                       <h4 class="text-white font-bold tracking-wider text-sm">\${car.name}</h4>
                                       <p class="text-[10px] text-white/40 uppercase mt-1">Select Vehicle</p>
                                   </div>
@@ -405,14 +408,22 @@ export const Motorcade = () => {
                            });
               
                            toggleGarage(true);
-                       });
+                       };
+                       document.body.addEventListener('sentinel-garage-open', window._garageOpenHandler);
               
                        window.toggleGarage = (show) => {
                            const drawer = document.getElementById('garage-drawer');
-                           if(show) drawer.classList.remove('translate-x-full');
-                           else {
+                           const proceedBtn = document.getElementById('proceed-btn-container');
+                           
+                           if(show) {
+                               drawer.classList.remove('translate-x-full');
+                               // Hide proceed button when drawer is open to prevent accidental clicks
+                               if(proceedBtn) proceedBtn.classList.add('invisible');
+                           } else {
                               drawer.classList.add('translate-x-full');
                               if(window.Sentinel) window.Sentinel.resetMotorcadeCamera();
+                              // Show proceed button when drawer is closed
+                              if(proceedBtn) proceedBtn.classList.remove('invisible');
                            }
                        }
               
@@ -433,7 +444,7 @@ export const Motorcade = () => {
                                placeholder.innerHTML = \`<img src="\${car.icon}" class="w-full h-full object-contain" />\`;
                            } else {
                                placeholder.innerHTML = 'Empty';
-                               placeholder.className = "text-6xl font-black text-white/5 uppercase select-none";
+                               placeholder.className = "text-6xl font-black text-white/5 uppercase select-none w-full h-full flex items-center justify-center";
                            }
               
                            // Handle Amount Selector Visibility
@@ -496,18 +507,23 @@ export const Motorcade = () => {
          }
 
          const updateProceedButton = () => {
-             const btn = document.getElementById('proceed-btn-container');
-             if (!btn) return;
+             const container = document.getElementById('proceed-btn-container');
+             const btn = document.getElementById('proceed-btn');
+             if (!container || !btn) return;
 
              // Only show if Principal is assigned (id is NOT 'none')
              const isPrincipalAssigned = window.MissionState && window.MissionState.principalAssigned;
              
              if (isPrincipalAssigned) {
-                 btn.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
-                 btn.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+                 container.classList.remove('opacity-0', 'translate-y-10', 'pointer-events-none');
+                 container.classList.add('opacity-100', 'translate-y-0');
+                 btn.classList.remove('pointer-events-none');
+                 btn.classList.add('pointer-events-auto');
              } else {
-                 btn.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
-                 btn.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
+                 container.classList.add('opacity-0', 'translate-y-10', 'pointer-events-none');
+                 container.classList.remove('opacity-100', 'translate-y-0');
+                 btn.classList.remove('pointer-events-auto');
+                 btn.classList.add('pointer-events-none');
              }
          }
 
@@ -536,7 +552,7 @@ export const Motorcade = () => {
 
 const Tooltip = ({ desc }: { desc: string }) => {
   return (
-    <span class="relative group/tooltip cursor-help inline-flex items-center gap-1 hover:text-white transition-colors">
+    <span class="relative group/tooltip cursor-help inline-flex items-center gap-1 hover:text-white transition-colors pointer-events-auto">
       <span class="text-[10px] text-gray-500 group-hover/tooltip:text-white transition-colors border border-gray-600 rounded-full w-3.5 h-3.5 flex items-center justify-center">
         ?
       </span>

@@ -14,7 +14,7 @@ export const DressCode = () => {
       <div class="relative z-30 w-full pt-[5vh] pb-4 bg-black px-12 flex items-center justify-between">
         {/* Back Button Integrated */}
         <button
-          class="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+          class="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto cursor-pointer"
           hx-get="/step/2"
           hx-target="#ui-layer"
         >
@@ -53,7 +53,7 @@ export const DressCode = () => {
         <div class="absolute inset-0 flex items-center justify-center gap-[45vw] z-40 pointer-events-none">
           {/* Left Arrow */}
           <button
-            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform"
+            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform cursor-pointer"
             onclick="cycleDressCode(-1)"
           >
             <svg
@@ -70,7 +70,7 @@ export const DressCode = () => {
 
           {/* Right Arrow */}
           <button
-            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform"
+            class="pointer-events-auto p-4 rounded-full border-2 border-white/30 hover:bg-white hover:text-black hover:scale-110 transition-all text-white backdrop-blur-sm will-change-transform cursor-pointer"
             onclick="cycleDressCode(1)"
           >
             <svg
@@ -90,7 +90,7 @@ export const DressCode = () => {
         <div class="absolute bottom-[4vh] w-full flex justify-center z-50 pointer-events-none">
           <button
             id="toggle-info-btn"
-            class="pointer-events-auto p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md"
+            class="pointer-events-auto p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md cursor-pointer"
             onclick="toggleInfoCard()"
             title="Toggle Info"
           >
@@ -151,7 +151,7 @@ export const DressCode = () => {
             </div>
 
             <button
-              class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)] will-change-transform"
+              class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)] will-change-transform cursor-pointer"
               hx-get="/step/4"
               hx-target="#ui-layer"
             >
@@ -171,8 +171,32 @@ export const DressCode = () => {
                   { id: 'tactical_casual', title: 'Tactical Casual', desc: 'Low-profile tactical gear blended with civilian clothing. Plate carriers visible but understated. Good for high-risk public areas where a show of force is necessary but not overwhelming.' },
                   { id: 'full_tactical', title: 'Full Tactical', desc: 'Heavy exterior armor, visible weaponry, and helmet systems. Maximum deterrence and protection. Not suitable for covert operations. Use only in high-threat zones.' }
               ];
-              let currentIndex = 0;
-              setTimeout(() => { document.body.dispatchEvent(new CustomEvent('sentinel-bg-change', { detail: { theme: options[0].id } })); }, 100);
+              
+              if (!window.MissionState) window.MissionState = {};
+              
+              // Restore state or default
+              let currentIndex = options.findIndex(o => o.id === window.MissionState.dressCode);
+              if (currentIndex === -1) currentIndex = 0;
+              
+              // Force background cleanup and initialization
+              const initDressCode = () => {
+                  if (window.Sentinel) {
+                      const current = options[currentIndex];
+                      console.log("Sentinel: Resetting from Motorcade to DressCode [" + current.id + "]");
+                      
+                      // Update UI to match restored state
+                      document.getElementById('dress-title').innerText = current.title;
+                      document.getElementById('dress-desc').innerText = current.desc;
+                      
+                      window.Sentinel.changeBackground(current.id);
+                      window.MissionState.dressCode = current.id;
+                  } else {
+                      setTimeout(initDressCode, 100);
+                  }
+              };
+              
+              initDressCode();
+
               window.cycleDressCode = (direction) => {
                   currentIndex += direction;
                   if (currentIndex < 0) currentIndex = options.length - 1;
@@ -180,7 +204,9 @@ export const DressCode = () => {
                   const current = options[currentIndex];
                   document.getElementById('dress-title').innerText = current.title;
                   document.getElementById('dress-desc').innerText = current.desc;
-                  document.body.dispatchEvent(new CustomEvent('sentinel-bg-change', { detail: { theme: current.id } }));
+                  
+                  window.MissionState.dressCode = current.id;
+                  if(window.Sentinel) window.Sentinel.changeBackground(current.id);
               };
 
               window.toggleInfoCard = () => {

@@ -109,9 +109,9 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.container.appendChild(this.renderer.domElement);
 
-    // ATTACH CONTROLS TO BODY: This fixes the 'unable to move freely' issue
-    // because the UI layers on top were intercepting mouse events.
-    this.controls = new OrbitControls(this.camera, document.body);
+    // Attach controls to the canvas. Events pass through #ui-layer (pointer-events: none)
+    // and reach the canvas for views that need 3D interaction (Motorcade).
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
@@ -374,10 +374,15 @@ export class SceneManager {
   private onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.refresh();
     }, 150);
+  }
+
+  /** Force renderer + camera to match current viewport. Called after HTMX swaps. */
+  public refresh(): void {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   private animate(): void {
@@ -432,6 +437,17 @@ export class SceneManager {
     this.skipFormationAnimation = false;
     if (this.controls) this.controls.enabled = false;
 
+    // --- MOTORCADE CLEANUP ---
+    if (this.groundPlane) this.groundPlane.visible = false;
+    this.slotGroup.visible = false;
+    this.motorcadeSpotLights.forEach((light) => {
+      light.visible = false;
+      if (light.target) light.target.visible = false;
+    });
+    this.motorcadeBeams.forEach((beam) => (beam.visible = false));
+    this.motorcadeLightPools.forEach((pool) => (pool.visible = false));
+    this.loadedVehicles.forEach((v) => (v.visible = false));
+
     if (themeId !== "black") {
       this.camera.position.set(0, 0, 8);
       this.camera.lookAt(0, 0, 0);
@@ -466,12 +482,13 @@ export class SceneManager {
     mat.map = entry.texture;
     mat.needsUpdate = true;
 
+    this.bgMesh!.position.set(0, -2, -5); // Ensure position is reset from any previous mode
     this.bgMesh!.visible = true;
     this.activeVideoPath = videoPath;
 
-    // Play from the start
+    // Play from the start — guard against play/pause race condition
     entry.video.currentTime = 0;
-    entry.video.play();
+    entry.video.play().catch(() => {});
     // this.currentTheme = themeId;
   }
 
@@ -541,46 +558,41 @@ export class SceneManager {
       this.controls.target.set(0, 0, 0);
       this.controls.update();
     }
-    if (this.groundPlane) this.groundPlane.visible = true;
-
-    // --- NUCLEAR CLEANUP: Eradicate all ghost artifacts from previous steps ---
-    // Hide background video plane
+    
+    // --- ABSOLUTE CLEANUP ---
     if (this.bgMesh) {
-      this.bgMesh.visible = false;
+        this.bgMesh.visible = false;
+        this.bgMesh.position.set(0, -2, -5); // Reset to default position
+    }
+    this.pauseAllVideos();
+    this.activeVideoPath = null;
+    
+    if (this.groundPlane) {
+        this.groundPlane.visible = true;
+        this.groundPlane.position.y = -0.05;
     }
 
-    // Pause all cached video elements
-    this.pauseAllVideos();
-
-    // Hide the entire formation group and all its children recursively
+    // Hide the entire formation group
     this.formationGroup.visible = false;
     this.formationGroup.traverse((child) => {
       child.visible = false;
     });
 
-    // Explicitly hide every principal instance and its descendant meshes
+    // Explicitly hide every principal instance
     this.principalInstances.forEach((p) => {
       p.visible = false;
-      p.traverse((child) => {
-        child.visible = false;
-      });
     });
 
-    // Hide the preloaded principal template if it exists
-    if (this.principalModel) {
-      this.principalModel.visible = false;
-    }
-
-    // Horizontal Side View Camera (90 Degree Rotation)
-    this.cameraTargetPos.set(25, 8, 0); // Side view
+    // Reset Camera to Side View
+    this.cameraTargetPos.set(25, 8, 0);
     this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
 
-    // Clear old SpotLights and Beams
+    // Clear old lights/beams but KEEP the slotGroup reference
     this.motorcadeSpotLights.forEach((light) => {
       this.scene.remove(light);
-      this.scene.remove(light.target);
+      if (light.target) this.scene.remove(light.target);
     });
     this.motorcadeBeams.forEach((beam) => this.scene.remove(beam));
     this.motorcadeLightPools.forEach((pool) => this.scene.remove(pool));
@@ -594,11 +606,16 @@ export class SceneManager {
 
     const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
 
-    // Volumetric Beam Geometry & Material
-    const beamGeo = new THREE.CylinderGeometry(0.1, 4.5, 25, 32, 1, true);
-    beamGeo.translate(0, -12.5, 0); // Origin at top
+    // RESTORE VEHICLE VISIBILITY
+    this.loadedVehicles.forEach((v) => {
+      v.visible = true;
+      v.traverse(child => { child.visible = true; });
+    });
 
-    // Light Pool Geometry (Circle on floor)
+    // Volumetric Beam Geometry
+    const beamGeo = new THREE.CylinderGeometry(0.1, 4.5, 25, 32, 1, true);
+    beamGeo.translate(0, -12.5, 0);
+
     const poolGeo = new THREE.PlaneGeometry(9, 9);
     if (!this.radiantTexture) this.radiantTexture = this.createRadiantTexture();
 
@@ -606,7 +623,6 @@ export class SceneManager {
     config.forEach((slotData) => {
       this.createHolographicSlot(slotData);
 
-      // Individual SpotLight for each slot
       const spotLight = new THREE.SpotLight(0xffffff, 800);
       spotLight.position.set(slotData.x, 25, slotData.z);
       spotLight.target.position.set(slotData.x, 0, slotData.z);
@@ -620,7 +636,6 @@ export class SceneManager {
       this.scene.add(spotLight.target);
       this.motorcadeSpotLights.push(spotLight);
 
-      // Volumetric Beam Mesh
       const beamMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         transparent: true,
@@ -634,7 +649,6 @@ export class SceneManager {
       this.scene.add(beam);
       this.motorcadeBeams.push(beam);
 
-      // Radiant Light Pool (Plane on floor with gradient texture)
       const poolMat = new THREE.MeshBasicMaterial({
         map: this.radiantTexture,
         transparent: true,
@@ -650,6 +664,7 @@ export class SceneManager {
     });
 
     this.slotGroup.visible = true;
+    this.renderer.render(this.scene, this.camera); // Force one render frame
   }
 
   public focusOnSlot(slotId: number) {

@@ -108,12 +108,26 @@ export const PrincipalCount = () => {
 
       <script>
         {`
-          window.principalCount = 1;
+          // Initialize state if not present
+          if (!window.MissionState) window.MissionState = {};
+          
+          window.principalCount = window.MissionState.principalCount || 1;
 
           // Initialize 3D Scene on load
-          setTimeout(() => {
-             if(window.Sentinel) window.Sentinel.updatePrincipals(1);
-          }, 100);
+          const initPrincipalCount = () => {
+             if(window.Sentinel) {
+                window.Sentinel.updatePrincipals(window.principalCount);
+                // Update UI to match restored state
+                const display = document.getElementById('count-display');
+                if (display) {
+                    display.innerText = window.principalCount >= 5 ? '5+' : window.principalCount;
+                }
+             } else {
+                setTimeout(initPrincipalCount, 100);
+             }
+          };
+          
+          initPrincipalCount();
 
           window.updatePrincipalCount = (change) => {
              let newCount = window.principalCount + change;
@@ -121,6 +135,7 @@ export const PrincipalCount = () => {
              if (newCount > 5) newCount = 5; 
              
              window.principalCount = newCount;
+             window.MissionState.principalCount = newCount;
              
              // Update UI
              const display = document.getElementById('count-display');

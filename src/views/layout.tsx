@@ -17,8 +17,7 @@ export const Layout = ({ children }: { children: any }) => {
           {`
             body { margin: 0; overflow: hidden; background-color: #0a0a0a; color: white; }
             #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
-            #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; width: 100vw; }  
-            #ui-layer > * { pointer-events: auto; }
+            #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; width: 100vw; }
           `}
         </style>
       </head>

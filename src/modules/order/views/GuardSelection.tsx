@@ -87,6 +87,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Vanguard';"
           >
             Select Vanguard
           </button>
@@ -140,6 +141,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Sentinel';"
           >
             Select Sentinel
           </button>
@@ -190,6 +192,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Praetorian';"
           >
             Select Praetorian
           </button>
