@@ -180,6 +180,8 @@ export const DressCode = () => {
               
               // Force background cleanup and initialization
               const initDressCode = () => {
+                  // Abort if DressCode was swapped out by HTMX
+                  if (!document.getElementById('dress-title')) return;
                   if (window.Sentinel) {
                       const current = options[currentIndex];
                       console.log("Sentinel: Resetting from Motorcade to DressCode [" + current.id + "]");

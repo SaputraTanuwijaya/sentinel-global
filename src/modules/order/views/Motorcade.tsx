@@ -324,6 +324,7 @@ export const Motorcade = () => {
       {/* SCRIPT */}
       <script>
         {`
+                       (function() {
                        let currentSlotId = null;
                        let currentRole = null;
                        let selectedVehicle = null;
@@ -331,6 +332,8 @@ export const Motorcade = () => {
               
                        // Wait for Sentinel to be ready
                        const initInterval = setInterval(() => {
+                           // Abort if Motorcade was swapped out by HTMX
+                           if (!document.getElementById('garage-drawer')) { clearInterval(initInterval); return; }
                            if (window.Sentinel) {
                                clearInterval(initInterval);
                                const tier = (window.MissionState && window.MissionState.tierName) ? window.MissionState.tierName : 'Praetorian';
@@ -544,6 +547,7 @@ export const Motorcade = () => {
 
          // Initial Check
          setTimeout(updateProceedButton, 500);
+                       })();
       `}
       </script>
     </div>

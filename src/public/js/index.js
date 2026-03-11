@@ -30900,6 +30900,10 @@ class SceneManager {
   }
   changeBackground(themeId) {
     console.log(`Sentinel 3D: Switching to [${themeId}]`);
+    if (this.isMotorcade && themeId === "black") {
+      console.warn("Sentinel: Blocked stale changeBackground('black') while in Motorcade mode");
+      return;
+    }
     this.isMotorcade = false;
     this.skipFormationAnimation = false;
     if (this.controls)
@@ -30934,6 +30938,8 @@ class SceneManager {
     this.pauseAllVideos();
     if (!this.bgMesh) {
       this.initBgMesh();
+    } else if (!this.bgMesh.parent) {
+      this.scene.add(this.bgMesh);
     }
     const entry = this.getOrCreateVideo(videoPath);
     const mat = this.bgMesh.material;
@@ -30990,7 +30996,10 @@ class SceneManager {
     }
     if (this.bgMesh) {
       this.bgMesh.visible = false;
-      this.bgMesh.position.set(0, -2, -5);
+      const mat = this.bgMesh.material;
+      mat.map = null;
+      mat.needsUpdate = true;
+      this.scene.remove(this.bgMesh);
     }
     this.pauseAllVideos();
     this.activeVideoPath = null;

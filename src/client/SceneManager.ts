@@ -433,6 +433,15 @@ export class SceneManager {
     // Debug theme
     console.log(`Sentinel 3D: Switching to [${themeId}]`);
 
+    // Guard: Reject stale calls from old view scripts (e.g. Rendezvous
+    // setTimeout still firing after HTMX swapped to Motorcade).
+    if (this.isMotorcade && themeId === "black") {
+      console.warn(
+        "Sentinel: Blocked stale changeBackground('black') while in Motorcade mode",
+      );
+      return;
+    }
+
     this.isMotorcade = false;
     this.skipFormationAnimation = false;
     if (this.controls) this.controls.enabled = false;
@@ -472,6 +481,9 @@ export class SceneManager {
     // Ensure the bg mesh exists (first call creates geometry + material)
     if (!this.bgMesh) {
       this.initBgMesh();
+    } else if (!this.bgMesh.parent) {
+      // Re-add to scene if it was removed by initMotorcadeMode
+      this.scene.add(this.bgMesh);
     }
 
     // Get or create the cached video+texture pair for this path
@@ -558,18 +570,23 @@ export class SceneManager {
       this.controls.target.set(0, 0, 0);
       this.controls.update();
     }
-    
+
     // --- ABSOLUTE CLEANUP ---
+    // Remove bgMesh from scene graph entirely — setting visible=false alone
+    // is not enough because VideoTexture can still trigger GPU texture updates.
     if (this.bgMesh) {
-        this.bgMesh.visible = false;
-        this.bgMesh.position.set(0, -2, -5); // Reset to default position
+      this.bgMesh.visible = false;
+      const mat = this.bgMesh.material as THREE.MeshBasicMaterial;
+      mat.map = null;
+      mat.needsUpdate = true;
+      this.scene.remove(this.bgMesh);
     }
     this.pauseAllVideos();
     this.activeVideoPath = null;
-    
+
     if (this.groundPlane) {
-        this.groundPlane.visible = true;
-        this.groundPlane.position.y = -0.05;
+      this.groundPlane.visible = true;
+      this.groundPlane.position.y = -0.05;
     }
 
     // Hide the entire formation group
@@ -609,7 +626,9 @@ export class SceneManager {
     // RESTORE VEHICLE VISIBILITY
     this.loadedVehicles.forEach((v) => {
       v.visible = true;
-      v.traverse(child => { child.visible = true; });
+      v.traverse((child) => {
+        child.visible = true;
+      });
     });
 
     // Volumetric Beam Geometry

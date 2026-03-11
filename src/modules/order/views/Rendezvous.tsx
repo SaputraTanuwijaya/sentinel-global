@@ -252,6 +252,9 @@ export const Rendezvous = () => {
                 let map;
                 let marker;
 
+                // Reset 3D scene immediately on page entry (before waiting for Leaflet)
+                document.body.dispatchEvent(new CustomEvent('sentinel-bg-change', { detail: { theme: 'black' } }));
+
                 const updateLocation = (lat, lng, fly = false) => {
                     const latNum = parseFloat(lat);
                     const lngNum = parseFloat(lng);
@@ -287,6 +290,9 @@ export const Rendezvous = () => {
                 };
 
                 const initMap = () => {
+                    // Abort if Rendezvous was swapped out by HTMX
+                    if (!document.getElementById('map')) return;
+
                     if (typeof L === 'undefined') {
                         setTimeout(initMap, 100);
                         return;
@@ -412,7 +418,7 @@ export const Rendezvous = () => {
                         }
                     };
 
-                    document.body.dispatchEvent(new CustomEvent('sentinel-bg-change', { detail: { theme: 'black' } }));
+                    // Scene reset already dispatched at top of IIFE — no need to repeat here
                 };
 
                 initMap();
