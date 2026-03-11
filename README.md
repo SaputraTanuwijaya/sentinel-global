@@ -32,6 +32,11 @@ sentinel-global/
 │   ├── modules/             # Feature logic
 │   │   └── order/
 │   │       └── views/       # Step-by-step wizard components
+│   │           ├── PrincipalCount.tsx
+│   │           ├── GuardSelection.tsx
+│   │           ├── DressCode.tsx
+│   │           ├── Motorcade.tsx
+│   │           └── Rendezvous.tsx  # Step 5: Map & Extraction
 │   ├── views/               # Shared Layouts
 │   └── index.tsx            # Main Server Entry Point (Routes)
 ├── Optimization_Plan.md     # Technical roadmap for performance
@@ -46,9 +51,17 @@ The application uses a "Single Page Wizard" feel without full reloads:
 1.  **Mission Profile:** Select number of Principals (VIPs) in 3D phalanx.
 2.  **Security Tier:** Select capability level (Vanguard, Sentinel, Praetorian).
 3.  **Visuals:** Select attire (Dress Code) with real-time video preview.
-4.  **Motorcade:** _[Done]_ 3D Vehicle Formation Builder (Deployment Grid).
-5.  **Mission Parameters:** _[In Progress]_ Leaflet Map & GPS routing.
+4.  **Motorcade:** 3D Vehicle Formation Builder (Deployment Grid).
+5.  **Mission Parameters:** Interactive Leaflet Map & Smart Vector Import (Supports Google Maps Decryption).
 6.  **Checkout:** _[Pending]_ Secure Mission Deployment Summary.
+
+## 5. Asset Specifications
+
+For vehicle icons and UI elements:
+- **Aspect Ratio:** 16:9 (Widescreen).
+- **Resolution:** 1280 x 720 px or 1920 x 1080 px.
+- **Composition:** Center-weighted asset with dark background for seamless glassmorphism blending.
+- **CSS Logic:** `object-contain` is preferred for non-square assets to prevent tactical detail loss.
 
 ## 5. Development Workflow
 

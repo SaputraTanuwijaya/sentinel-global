@@ -316,30 +316,30 @@ export const Motorcade = () => {
                        // DATABASE: Expanded Vehicle Constraints
                        const VEHICLE_DB = {
                            'PRINCIPAL': [
-                               { id: 'Escalade', name: 'Cadillac Escalade', desc: 'Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.', img: 'Armored', specs: { armor: 'B7 (Heavy)', protection: 'Explosive Resistant', hp: '420 HP', torque: '460 LB-FT', speed: '130 MPH', occ: '2+2' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                               { id: 'Escalade', name: 'Cadillac Escalade', desc: 'Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.', icon: '/public/assets/images/Escalade_Icon.jpeg', specs: { armor: 'B7 (Heavy)', protection: 'Explosive Resistant', hp: '420 HP', torque: '460 LB-FT', speed: '130 MPH', occ: '2+2' } },
+                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'LEAD': [
-                               { id: 'F150', name: 'Ford F-150', desc: 'Heavy Pursuit & Ramming Vehicle. Equipped with bull bars and high-torque engine for roadblock clearance.', img: 'Heavy', specs: { armor: 'B6 (Light)', protection: 'Ballistic (Level 3)', hp: '450 HP', torque: '510 LB-FT', speed: '110 MPH', occ: '4' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                               { id: 'F150', name: 'Ford F-150', desc: 'Heavy Pursuit & Ramming Vehicle. Equipped with bull bars and high-torque engine for roadblock clearance.', icon: '/public/assets/images/F150_Icon.jpeg', specs: { armor: 'B6 (Light)', protection: 'Ballistic (Level 3)', hp: '450 HP', torque: '510 LB-FT', speed: '110 MPH', occ: '4' } },
+                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'REAR': [
-                              { id: 'Suburban', name: 'Chevy Suburban', desc: 'Support & Medical Evacuation. Carries trauma kits and secondary communication arrays.', img: 'Support', specs: { armor: 'B6', protection: 'Ballistic (Level 4)', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '6' } },
-                              { id: 'F150', name: 'Ford F-150 Support', desc: 'Tactical Support Vehicle. Cargo-optimized for logistics and gear.', img: 'Logistics', specs: { armor: 'B5', protection: 'Partial Ballistic', hp: '400 HP', torque: '500 LB-FT', speed: '105 MPH', occ: '2' } },
-                              { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                              { id: 'Suburban', name: 'Chevy Suburban', desc: 'Support & Medical Evacuation. Carries trauma kits and secondary communication arrays.', icon: '/public/assets/images/Suburban_Icon.jpeg', specs: { armor: 'B6', protection: 'Ballistic (Level 4)', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '6' } },
+                              { id: 'F150', name: 'Ford F-150 Support', desc: 'Tactical Support Vehicle. Cargo-optimized for logistics and gear.', icon: '/public/assets/images/F150_Icon.jpeg', specs: { armor: 'B5', protection: 'Partial Ballistic', hp: '400 HP', torque: '500 LB-FT', speed: '105 MPH', occ: '2' } },
+                              { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'SWEEPER': [
-                               { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', img: 'Scout', specs: { armor: 'None', protection: 'None', hp: '205 HP', torque: '83 LB-FT', speed: '185 MPH', occ: '1' } },
-                               { id: 'Electra', name: 'Electra Glide Tactical', desc: 'Heavy Escort Cruiser. Optimized for motorcade stability, providing a high-visibility tactical presence.', img: 'Escort', specs: { armor: 'None', protection: 'None', hp: '105 HP', torque: '122 LB-FT', speed: '115 MPH', occ: '1' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                               { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', icon: '/public/assets/images/S1000RR_Icon.jpeg', specs: { armor: 'None', protection: 'None', hp: '205 HP', torque: '83 LB-FT', speed: '185 MPH', occ: '1' } },
+                               { id: 'Electra', name: 'Electra Glide Tactical', desc: 'Heavy Escort Cruiser. Optimized for motorcade stability, providing a high-visibility tactical presence.', icon: '/public/assets/images/ElectraGlide_Icon.jpeg', specs: { armor: 'None', protection: 'None', hp: '105 HP', torque: '122 LB-FT', speed: '115 MPH', occ: '1' } },
+                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'CAT': [
-                               { id: 'G63', name: 'Mercedes G63 CAT', desc: 'Counter Assault Team Unit. Integrated weapons storage and rapid egress points for tactical operators.', img: 'Assault', specs: { armor: 'B6+', protection: 'High Ballistic (Level 4+)', hp: '577 HP', torque: '627 LB-FT', speed: '145 MPH', occ: '5' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                               { id: 'G63', name: 'Mercedes G63 CAT', desc: 'Counter Assault Team Unit. Integrated weapons storage and rapid egress points for tactical operators.', icon: '/public/assets/images/G63AMG_Icon.jpeg', specs: { armor: 'B6+', protection: 'High Ballistic (Level 4+)', hp: '577 HP', torque: '627 LB-FT', speed: '145 MPH', occ: '5' } },
+                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ],
                            'ECM': [
-                               { id: 'Suburban', name: 'Chevy Suburban ECM', desc: 'Electronic Countermeasures. Signal jamming suite for IED neutralization and secure comms uplink.', img: 'Tech', specs: { armor: 'B6', protection: 'Ballistic', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '2' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', img: 'Empty', specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
+                               { id: 'Suburban', name: 'Chevy Suburban ECM', desc: 'Electronic Countermeasures. Signal jamming suite for IED neutralization and secure comms uplink.', icon: '/public/assets/images/Suburban_Icon.jpeg', specs: { armor: 'B6', protection: 'Ballistic', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '2' } },
+                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
                            ]
                        };
               
@@ -365,10 +365,12 @@ export const Motorcade = () => {
                                card.className = "w-full bg-white/5 border border-white/10 p-4 rounded-xl cursor-pointer hover:bg-white/10 hover:border-white/40 transition-all group flex items-center gap-4";
                                card.onclick = () => selectVehicle(car);
                                
+                               const iconHtml = car.icon 
+                                 ? \`<img src="\${car.icon}" class="w-20 h-20 object-contain rounded-lg border border-white/10 group-hover:border-white/30 transition-all" />\`
+                                 : \`<div class="w-20 h-20 bg-gradient-to-br from-gray-800 to-black rounded-lg flex items-center justify-center text-gray-500 group-hover:text-white transition-colors shrink-0 text-[10px] uppercase font-bold text-center">Empty</div>\`;
+
                                card.innerHTML = \`
-                                  <div class="w-20 h-20 bg-gradient-to-br from-gray-800 to-black rounded-lg flex items-center justify-center text-gray-500 group-hover:text-white transition-colors shrink-0 text-[10px] uppercase font-bold text-center">
-                                      \${car.img}
-                                  </div>
+                                  \${iconHtml}
                                   <div>
                                       <h4 class="text-white font-bold tracking-wider text-sm">\${car.name}</h4>
                                       <p class="text-[10px] text-white/40 uppercase mt-1">Select Vehicle</p>
@@ -400,7 +402,14 @@ export const Motorcade = () => {
                            document.getElementById('drawer-title').innerText = "Vehicle Details:";
                            document.getElementById('detail-name').innerText = car.name;
                            document.getElementById('detail-desc').innerText = car.desc;
-                           document.getElementById('detail-img-placeholder').innerText = car.img;
+                           
+                           const placeholder = document.getElementById('detail-img-placeholder');
+                           if (car.icon) {
+                               placeholder.innerHTML = \`<img src="\${car.icon}" class="w-full h-full object-contain" />\`;
+                           } else {
+                               placeholder.innerHTML = 'Empty';
+                               placeholder.className = "text-6xl font-black text-white/5 uppercase select-none";
+                           }
               
                            // Handle Amount Selector Visibility
                            const amountContainer = document.getElementById('amount-selector-container');

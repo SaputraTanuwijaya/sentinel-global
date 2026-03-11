@@ -4,5 +4,4 @@ dist/
 .DS_Store
 *.log
 GEMINI.md
-CLI_BLUEPRINT.md
 Optimization_Plan.md
