@@ -4,7 +4,32 @@ export const Motorcade = () => {
   return (
     <div class="relative h-full w-full pointer-events-none z-50">
       {/* Header */}
-      <div class="absolute top-8 left-8 pointer-events-auto flex flex-col gap-4">
+      <div class="absolute top-10 left-10 pointer-events-auto flex flex-col gap-8">
+        {/* Back Button Integrated */}
+        <button
+          class="w-fit p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5"
+          hx-get="/step/3"
+          hx-target="#ui-layer"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-[0.2em]">
+            Back
+          </span>
+        </button>
+
         <div>
           <h2 class="text-4xl text-white font-bold tracking-widest uppercase">
             Deployment Grid

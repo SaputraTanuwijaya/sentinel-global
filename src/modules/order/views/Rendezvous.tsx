@@ -3,6 +3,31 @@ import { Html } from "@elysiajs/html";
 export const Rendezvous = () => {
   return (
     <div class="relative h-screen w-screen overflow-hidden pointer-events-none select-none">
+      {/* Back Button */}
+      <button
+        class="absolute top-10 left-10 z-50 p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+        hx-get="/step/4"
+        hx-target="#ui-layer"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        <span class="text-[10px] font-bold uppercase tracking-[0.2em]">
+          Back
+        </span>
+      </button>
+
       {/* Leaflet CSS */}
       <link
         rel="stylesheet"

@@ -2,14 +2,46 @@ import { Html } from "@elysiajs/html";
 
 export const GuardSelection = () => {
   return (
-    <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 backdrop-blur-sm animate-fade-in overflow-y-auto py-10">
-      {/* Header */}
+    <div class="flex flex-col items-center h-full w-full pointer-events-auto bg-black/90 backdrop-blur-sm animate-fade-in overflow-y-auto py-12 px-12">
+      {/* Header Row */}
+      <div class="w-full flex items-center justify-between mb-12 z-10">
+        {/* Back Button Integrated */}
+        <button
+          class="p-3 rounded-full bg-white/5 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+          hx-get="/step/1"
+          hx-target="#ui-layer"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-[0.2em]">
+            Back
+          </span>
+        </button>
+
+        <div class="absolute left-1/2 -translate-x-1/2 text-center">
+          <h2 class="text-4xl text-white font-bold tracking-[0.2em] mb-4 drop-shadow-2xl font-mono uppercase">
+            Select Security Tier
+          </h2>
+          <div class="h-1 w-24 bg-white mx-auto rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
+        </div>
+
+        <div class="w-24"></div>
+      </div>
+
       <div class="text-center mb-12 z-10">
-        <h2 class="text-4xl text-white font-bold tracking-[0.2em] mb-4 drop-shadow-2xl font-mono uppercase">
-          Select Security Tier
-        </h2>
-        <div class="h-1 w-24 bg-white mx-auto rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)]"></div>
-        <p class="text-gray-400 mt-4 tracking-wide font-light">
+        <p class="text-gray-400 tracking-wide font-light">
           Choose the operational capability of your detail.
         </p>
       </div>

@@ -4,25 +4,56 @@ export const PrincipalCount = () => {
   return (
     <div class="flex flex-col items-center justify-end h-full w-full pointer-events-auto bg-transparent animate-fade-in pb-[15vh]">
       {/* Header */}
-      <div class="absolute top-12 w-full text-center z-10">
-        <h2 class="text-4xl text-white font-bold tracking-[0.3em] mb-4 drop-shadow-2xl font-mono uppercase flex items-center justify-center gap-3">
-          Mission Profile
-        </h2>
-
-        <div class="h-px w-32 bg-white/50 mx-auto"></div>
-
-        <div class="flex items-center justify-center gap-2 mt-4">
-          <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
-            Identify Principals
+      <div class="absolute top-12 w-full px-12 flex items-center justify-between z-10">
+        {/* Back Button Integrated */}
+        <button
+          class="p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+          hx-get="/"
+          hx-target="body"
+          hx-push-url="true"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-[0.2em]">
+            Back
           </span>
-          <Tooltip
-            term=""
-            desc="High-value individuals requiring direct escort and protection during the mission."
-          />
-          <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
-            for Protection
-          </span>
+        </button>
+
+        <div class="absolute left-1/2 -translate-x-1/2 text-center w-full pointer-events-none">
+          <h2 class="text-4xl text-white font-bold tracking-[0.3em] mb-4 drop-shadow-2xl font-mono uppercase flex items-center justify-center gap-3">
+            Mission Profile
+          </h2>
+
+          <div class="h-px w-32 bg-white/50 mx-auto"></div>
+
+          <div class="flex items-center justify-center gap-2 mt-4">
+            <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
+              Identify Principals
+            </span>
+            <Tooltip
+              term=""
+              desc="High-value individuals requiring direct escort and protection during the mission."
+            />
+            <span class="text-gray-300 font-light tracking-widest text-sm uppercase">
+              for Protection
+            </span>
+          </div>
         </div>
+
+        {/* Spacer */}
+        <div class="w-24"></div>
       </div>
 
       <div class="flex items-center gap-20 z-10">

@@ -11,12 +11,41 @@ export const DressCode = () => {
       </div>
 
       {/* Header */}
-      <div class="relative z-30 w-full text-center pt-[5vh] pb-4 bg-black">
-        <h2 class="text-4xl text-white font-bold tracking-widest uppercase drop-shadow-md">
-          Select Dress Code
-        </h2>
+      <div class="relative z-30 w-full pt-[5vh] pb-4 bg-black px-12 flex items-center justify-between">
+        {/* Back Button Integrated */}
+        <button
+          class="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+          hx-get="/step/2"
+          hx-target="#ui-layer"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          <span class="text-[10px] font-bold uppercase tracking-[0.2em]">
+            Back
+          </span>
+        </button>
 
-        <div class="h-1 w-40 bg-white mx-auto mt-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+        <div class="absolute left-1/2 -translate-x-1/2 text-center">
+          <h2 class="text-4xl text-white font-bold tracking-widest uppercase drop-shadow-md">
+            Select Dress Code
+          </h2>
+          <div class="h-1 w-40 bg-white mx-auto mt-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></div>
+        </div>
+
+        {/* Spacer */}
+        <div class="w-24"></div>
       </div>
 
       <div class="relative flex-1 w-full">
