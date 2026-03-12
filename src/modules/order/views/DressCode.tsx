@@ -209,6 +209,9 @@ export const DressCode = () => {
                   
                   window.MissionState.dressCode = current.id;
                   if(window.Sentinel) window.Sentinel.changeBackground(current.id);
+
+                  // Trigger Ledger Update
+                  document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
               };
 
               window.toggleInfoCard = () => {

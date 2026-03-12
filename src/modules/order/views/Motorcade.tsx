@@ -534,12 +534,23 @@ export const Motorcade = () => {
              if(currentSlotId !== null && selectedVehicle && window.Sentinel) {
                  window.Sentinel.spawnVehicle(currentSlotId, selectedVehicle.id, vehicleAmount);
                  
+                 // Track in MissionState for Ledger
+                 if (!window.MissionState.motorcade) window.MissionState.motorcade = {};
+                 window.MissionState.motorcade[currentSlotId] = {
+                    role: currentRole,
+                    id: selectedVehicle.id,
+                    amount: selectedVehicle.id === 'none' ? 0 : vehicleAmount
+                 };
+
                  // Track Principal assignment in MissionState
                  if (currentRole === 'PRINCIPAL') {
                     if (!window.MissionState) window.MissionState = {};
                     window.MissionState.principalAssigned = (selectedVehicle.id !== 'none');
                     updateProceedButton();
                  }
+
+                 // Trigger Ledger Update
+                 document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
 
                  toggleGarage(false);
              }

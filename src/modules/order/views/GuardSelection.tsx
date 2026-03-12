@@ -60,18 +60,18 @@ export const GuardSelection = () => {
             urban environments.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            2,500 <span class="text-sm text-gray-500">CREDITS</span>
+            +$0 <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-300 flex-1">
             <li class="flex items-center gap-3">
               <span class="text-white">✓</span>
               <span>
-                1-3
+                1{" "}
                 <Tooltip
-                  term="CPOs"
-                  desc="Close Protection Officers. Standard physical defense unit."
-                />
+                  term="CPO"
+                  desc="Close Protection Officer. Standard physical defense unit."
+                />{" "}
                 per Principal
               </span>
             </li>
@@ -87,7 +87,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
-            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Vanguard';"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Vanguard'; window.MissionState.tierSelected = true; document.body.dispatchEvent(new CustomEvent('mission-state-updated'));"
           >
             Select Vanguard
           </button>
@@ -107,25 +107,25 @@ export const GuardSelection = () => {
             Tactical protection unit with threat assessment capabilities.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            8,000 <span class="text-sm text-gray-500">CREDITS</span>
+            +$150 <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-200 flex-1">
             <li class="flex items-center gap-3">
               <span class="text-white">✓</span>
               <span>
-                Includes
+                2{" "}
                 <Tooltip
-                  term="Analytical"
-                  desc="Officers trained in real-time threat assessment and decision making loops."
-                />
-                Lead
+                  term="CPOs"
+                  desc="Close Protection Officers. Tactical defense unit."
+                />{" "}
+                per Principal
               </span>
             </li>
             <li class="flex items-center gap-3">
               <span class="text-white">✓</span>
               <span>
-                Advanced
+                Advanced{" "}
                 <Tooltip
                   term="Triage"
                   desc="On-site medical emergency capability and trauma kits."
@@ -141,7 +141,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
-            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Sentinel';"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Sentinel'; window.MissionState.tierSelected = true; document.body.dispatchEvent(new CustomEvent('mission-state-updated'));"
           >
             Select Sentinel
           </button>
@@ -158,25 +158,25 @@ export const GuardSelection = () => {
             State-level maximum security. Proactive threat neutralization.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            15,000 <span class="text-sm text-gray-500">CREDITS</span>
+            +$400 <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-300 flex-1">
             <li class="flex items-center gap-3">
               <span class="text-sentinel-hud">✓</span>
               <span>
-                Includes
+                Includes{" "}
                 <Tooltip
                   term="Intel"
                   desc="Dedicated Intelligence Officer for advance route sweeping and digital surveillance."
-                />
+                />{" "}
                 Officer
               </span>
             </li>
             <li class="flex items-center gap-3">
               <span class="text-sentinel-hud">✓</span>
               <span>
-                Active
+                Active{" "}
                 <Tooltip
                   term="Surveillance"
                   desc="Counter-surveillance team to detect tailing hostiles."
@@ -192,7 +192,7 @@ export const GuardSelection = () => {
             class="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-widest rounded-lg hover:bg-white hover:text-black transition-all duration-300"
             hx-get="/step/3"
             hx-target="#ui-layer"
-            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Praetorian';"
+            onclick="if(!window.MissionState) window.MissionState = {}; window.MissionState.tierName = 'Praetorian'; window.MissionState.tierSelected = true; document.body.dispatchEvent(new CustomEvent('mission-state-updated'));"
           >
             Select Praetorian
           </button>

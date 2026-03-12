@@ -101,6 +101,7 @@ export const PrincipalCount = () => {
           class="px-16 py-5 bg-white text-black font-bold text-lg uppercase tracking-[0.2em] hover:bg-gray-300 hover:scale-105 transition-all duration-300 rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)]"
           hx-get="/step/2"
           hx-target="#ui-layer"
+          onclick="document.body.dispatchEvent(new CustomEvent('mission-state-updated'));"
         >
           Confirm Profile
         </button>
@@ -143,6 +144,9 @@ export const PrincipalCount = () => {
              
              // Update 3D Scene
              if(window.Sentinel) window.Sentinel.updatePrincipals(newCount);
+
+             // Trigger Ledger Update
+             document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
           }
         `}
       </script>
