@@ -175,7 +175,7 @@ export const Rendezvous = () => {
           </div>
 
           <button
-            class="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.2em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98]"
+            class="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.2em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98] cursor-pointer"
             hx-get="/step/6"
             hx-target="#ui-layer"
           >
