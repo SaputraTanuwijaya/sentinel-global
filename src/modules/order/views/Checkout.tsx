@@ -5,7 +5,6 @@ export const Checkout = () => {
     <div class="flex flex-col items-center h-full w-full pointer-events-auto bg-black/90 backdrop-blur-sm animate-fade-in overflow-y-auto py-12 px-12 custom-scrollbar">
       {/* Header Row */}
       <div class="w-full flex items-center justify-between mb-12 z-10 shrink-0">
-        {/* Back Button Integrated */}
         <button
           class="p-3 rounded-full bg-white/5 border border-white/10 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto cursor-pointer"
           hx-get="/step/5"
@@ -114,14 +113,14 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Payment Mockup */}
+        {/* RIGHT COLUMN: Payment */}
         <div class="glass-panel p-8 rounded-2xl bg-black/40 border border-white/10 flex flex-col gap-8">
           <div class="flex flex-col gap-2">
             <h3 class="text-white font-bold uppercase tracking-widest text-sm flex items-center gap-2">
               <span class="text-white/40">///</span> Secure Terminal
             </h3>
             <p class="text-[10px] text-gray-500 uppercase tracking-wider">
-              Encrypted Point-to-Point Transaction
+              Secure Point-to-Point Transaction
             </p>
           </div>
 
@@ -130,7 +129,8 @@ export const Checkout = () => {
             class="flex flex-col gap-6"
             hx-post="/api/checkout"
             hx-trigger="submit"
-            hx-swap="none"
+            hx-swap="innerHTML"
+            hx-target="#ui-layer"
             onsubmit="window.handleDeployment(event)"
           >
             <div class="flex flex-col gap-2">
@@ -148,33 +148,52 @@ export const Checkout = () => {
 
             <div class="flex flex-col gap-2">
               <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
-                Encrypted Card Number
+                Card Number
               </label>
-              <div class="relative">
+              <div class="flex items-center gap-2">
                 <input
-                  type="text"
-                  name="cardnumber"
-                  placeholder="XXXX XXXX XXXX XXXX"
-                  maxlength="19"
-                  class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm"
-                  required
+                  type="tel"
+                  name="cn1"
+                  id="cn1"
+                  maxlength="4"
+                  placeholder="XXXX"
+                  class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
+                  onkeydown="window.cardNav(event, '', 'cn2')"
+                  oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn2').focus();"
                 />
-                <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="1.5"
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                </div>
+                <span class="text-white/20 font-mono text-xs">—</span>
+                <input
+                  type="tel"
+                  name="cn2"
+                  id="cn2"
+                  maxlength="4"
+                  placeholder="XXXX"
+                  class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
+                  onkeydown="window.cardNav(event, 'cn1', 'cn3')"
+                  oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn3').focus();"
+                />
+                <span class="text-white/20 font-mono text-xs">—</span>
+                <input
+                  type="tel"
+                  name="cn3"
+                  id="cn3"
+                  maxlength="4"
+                  placeholder="XXXX"
+                  class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
+                  onkeydown="window.cardNav(event, 'cn2', 'cn4')"
+                  oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn4').focus();"
+                />
+                <span class="text-white/20 font-mono text-xs">—</span>
+                <input
+                  type="tel"
+                  name="cn4"
+                  id="cn4"
+                  maxlength="4"
+                  placeholder="XXXX"
+                  class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
+                  onkeydown="window.cardNav(event, 'cn3', 'expiry-mm')"
+                  oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('expiry-mm').focus();"
+                />
               </div>
             </div>
 
@@ -183,14 +202,29 @@ export const Checkout = () => {
                 <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
                   Expiry Date
                 </label>
-                <input
-                  type="text"
-                  name="expiry"
-                  placeholder="MM / YY"
-                  maxlength="5"
-                  class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
-                  required
-                />
+                <div class="flex items-center gap-2">
+                  <input
+                    type="tel"
+                    name="expiry-mm"
+                    id="expiry-mm"
+                    placeholder="MM"
+                    maxlength="2"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
+                    oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===2) document.getElementById('expiry-yy').focus();"
+                    onkeydown="window.cardNav(event, 'cn4', 'expiry-yy')"
+                  />
+                  <span class="text-white/30 font-mono">/</span>
+                  <input
+                    type="tel"
+                    name="expiry-yy"
+                    id="expiry-yy"
+                    placeholder="YY"
+                    maxlength="2"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
+                    oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===2) document.getElementById('cvc').focus();"
+                    onkeydown="window.cardNav(event, 'expiry-mm', 'cvc')"
+                  />
+                </div>
               </div>
               <div class="flex flex-col gap-2">
                 <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
@@ -199,9 +233,11 @@ export const Checkout = () => {
                 <input
                   type="password"
                   name="cvc"
+                  id="cvc"
                   placeholder="***"
                   maxlength="3"
                   class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-[0.5em]"
+                  oninput="this.value=this.value.replace(/\D/g,'')"
                   required
                 />
               </div>
@@ -244,106 +280,145 @@ export const Checkout = () => {
       <script>
         {`
           (function() {
-            if (!window.MissionState) window.MissionState = { hours: 6 };
-            
-            const PRICING = {
-              PRINCIPAL: 80,
-              TIERS: {
-                'Vanguard': 0,
-                'Sentinel': 150,
-                'Praetorian': 400
-              },
-              MOTORCADE: {
-                'PRINCIPAL': 100,
-                'SWEEPER': 30,
-                'LEAD': 70,
-                'CAT': 150,
-                'ECM': 200,
-                'REAR': 70
-              }
-            };
+            // Guard function registration only — NOT the init calls below
+            if (!window.__checkoutFnsRegistered) {
+              window.__checkoutFnsRegistered = true;
 
-            window.updateDuration = (val) => {
-              window.MissionState.hours = parseInt(val);
-              document.getElementById('duration-display').innerText = val + " HRS";
-              window.updateCheckoutTotals();
-              // Also update the ledger if it's open or updated
-              document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
-            };
+              const PRICING: { [key: string]: any } = {
+                PRINCIPAL: 80,
+                TIERS: {
+                  'Vanguard': 0,
+                  'Sentinel': 150,
+                  'Praetorian': 400
+                } as { [key: string]: number },
+                MOTORCADE: {
+                  'PRINCIPAL': 100,
+                  'SWEEPER': 30,
+                  'LEAD': 70,
+                  'CAT': 150,
+                  'ECM': 200,
+                  'REAR': 70
+                } as { [key: string]: number }
+              };
 
-            window.updateCheckoutTotals = () => {
-              const state = window.MissionState;
-              const summaryEl = document.getElementById('checkout-summary-content');
-              const hourlyEl = document.getElementById('checkout-hourly-rate');
-              const grandEl = document.getElementById('checkout-grand-total');
+              window.cardNav = (e, prevId, nextId) => {
+                const input = e.target;
+                // Block non-digit, non-control keys
+                if (
+                  !/^\d$/.test(e.key) &&
+                  !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) &&
+                  !e.metaKey &&
+                  !e.ctrlKey
+                ) {
+                  e.preventDefault();
+                  return;
+                }
+                // Auto-advance when field is full and a digit was just typed
+                if (/^\d$/.test(e.key) && input.value.length === parseInt(input.maxLength) && nextId) {
+                  setTimeout(() => document.getElementById(nextId)?.focus(), 0);
+                }
+                // Auto-retreat on backspace from empty field
+                if (e.key === 'Backspace' && input.value === '' && prevId) {
+                  e.preventDefault();
+                  document.getElementById(prevId)?.focus();
+                }
+              };
 
-              if (!summaryEl || !state) return;
+              window.updateDuration = (val) => {
+                window.MissionState.hours = parseInt(val);
+                document.getElementById('duration-display').innerText = val + ' HRS';
+                window.updateCheckoutTotals();
+                document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
+              };
 
-              let hourlyTotal = 0;
-              let html = '';
+              window.updateCheckoutTotals = () => {
+                const state = window.MissionState;
+                const summaryEl = document.getElementById('checkout-summary-content');
+                const hourlyEl = document.getElementById('checkout-hourly-rate');
+                const grandEl = document.getElementById('checkout-grand-total');
 
-              // Principal
-              const pCost = state.principalCount * PRICING.PRINCIPAL;
-              hourlyTotal += pCost;
-              html += \`
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-500 uppercase tracking-tighter">Principals (x\${state.principalCount})</span>
-                  <span class="text-white">$\${pCost.toLocaleString()}</span>
-                </div>
-              \`;
+                if (!summaryEl || !state) return;
 
-              // Tier
-              const tCost = PRICING.TIERS[state.tierName] || 0;
-              hourlyTotal += tCost;
-              html += \`
-                <div class="flex justify-between items-center">
-                  <span class="text-gray-500 uppercase tracking-tighter">Security Tier (\${state.tierName})</span>
-                  <span class="text-white">+$\${tCost.toLocaleString()}</span>
-                </div>
-              \`;
+                let hourlyTotal = 0;
+                let html = '';
 
-              // Motorcade
-              let mCost = 0;
-              if (state.motorcade) {
-                Object.values(state.motorcade).forEach(v => {
-                  if (v.id !== 'none') {
-                    const unitPrice = PRICING.MOTORCADE[v.role] || 0;
-                    mCost += (v.amount * unitPrice);
-                  }
-                });
-              }
-              
-              if (mCost > 0) {
-                hourlyTotal += mCost;
+                const pCost = (state.principalCount || 0) * PRICING.PRINCIPAL;
+                hourlyTotal += pCost;
                 html += \`
                   <div class="flex justify-between items-center">
-                    <span class="text-gray-500 uppercase tracking-tighter">Motorcade Assets</span>
-                    <span class="text-white">+$\${mCost.toLocaleString()}</span>
+                    <span class="text-gray-500 uppercase tracking-tighter">Principals (x\${state.principalCount})</span>
+                    <span class="text-white">$\${pCost.toLocaleString()}</span>
                   </div>
                 \`;
-              }
 
-              summaryEl.innerHTML = html;
-              hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
-              grandEl.innerText = \`$\${(hourlyTotal * state.hours).toLocaleString()} USD\`;
-            };
+                const tCost = (PRICING.TIERS as { [key: string]: number })[state.tierName] || 0;
+                hourlyTotal += tCost;
+                html += \`
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-500 uppercase tracking-tighter">Security Tier (\${state.tierName})</span>
+                    <span class="text-white">+$\${tCost.toLocaleString()}</span>
+                  </div>
+                \`;
 
-            window.handleDeployment = (e) => {
-              // Add MissionState to form data before HTMX sends it
-              const form = e.target;
-              const stateInput = document.createElement('input');
-              stateInput.type = 'hidden';
-              stateInput.name = 'missionState';
-              stateInput.value = JSON.stringify(window.MissionState);
-              form.appendChild(stateInput);
-            };
+                let mCost = 0;
+                if (state.motorcade) {
+                  Object.values(state.motorcade).forEach((v: any) => {
+                    if (v.id !== 'none') {
+                      const unitPrice = (PRICING.MOTORCADE as { [key: string]: number })[v.role] || 0;
+                      mCost += v.amount * unitPrice;
+                    }
+                  });
+                }
 
-            // Force cleanup of 3D background if we came from Map
-            if (window.Sentinel) {
-                window.Sentinel.changeBackground('black');
+                if (mCost > 0) {
+                  hourlyTotal += mCost;
+                  html += \`
+                    <div class="flex justify-between items-center">
+                      <span class="text-gray-500 uppercase tracking-tighter">Motorcade Assets</span>
+                      <span class="text-white">+$\${mCost.toLocaleString()}</span>
+                    </div>
+                  \`;
+                }
+
+                summaryEl.innerHTML = html;
+                hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
+                grandEl.innerText = \`$\${(hourlyTotal * state.hours).toLocaleString()} USD\`;
+              };
+
+              window.handleDeployment = (e) => {
+                const form = e.target;
+
+                // Merge 4 card segments — use getElementById, no querySelector template literal nesting
+                const cardNumber = ['cn1', 'cn2', 'cn3', 'cn4']
+                  .map(id => (document.getElementById(id) as HTMLInputElement)?.value || '')
+                  .join('');
+                const cardInput = document.createElement('input');
+                cardInput.type = 'hidden';
+                cardInput.name = 'cardnumber';
+                cardInput.value = cardNumber;
+                form.appendChild(cardInput);
+
+                // Merge expiry
+                const mm = (document.getElementById('expiry-mm') as HTMLInputElement)?.value || '';
+                const yy = (document.getElementById('expiry-yy') as HTMLInputElement)?.value || '';
+                const expiryInput = document.createElement('input');
+                expiryInput.type = 'hidden';
+                expiryInput.name = 'expiry';
+                expiryInput.value = mm + '/' + yy;
+                form.appendChild(expiryInput);
+
+                // MissionState
+                const stateInput = document.createElement('input');
+                stateInput.type = 'hidden';
+                stateInput.name = 'missionState';
+                stateInput.value = JSON.stringify(window.MissionState);
+                form.appendChild(stateInput);
+              };
             }
 
-            // Initial render
+            // These run every swap, not just once
+            if (!window.MissionState) window.MissionState = { hours: 6 };
+            if (window.Sentinel) window.Sentinel.changeBackground('black');
             window.updateCheckoutTotals();
           })();
         `}
