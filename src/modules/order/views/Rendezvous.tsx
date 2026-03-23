@@ -148,8 +148,9 @@ export const Rendezvous = () => {
           </div>
 
           <div class="flex flex-col gap-2 pointer-events-auto">
-            <label class="text-[10px] text-gray-400 uppercase tracking-widest font-bold select-none">
+            <label class="text-[10px] text-gray-400 uppercase tracking-widest font-bold select-none flex justify-between">
               Extraction Time (UTC)
+              <span id="time-error" class="text-red-500 hidden font-bold">MIN 1H FROM NOW</span>
             </label>
             <div
               class="relative cursor-pointer group/time"
@@ -159,13 +160,16 @@ export const Rendezvous = () => {
                 id="extraction-time"
                 type="datetime-local"
                 class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white focus:outline-none focus:border-white/40 transition-all [color-scheme:dark] font-mono pointer-events-auto relative z-20 cursor-pointer group-hover/time:bg-white/10"
-                onchange="if(window.MissionState) window.MissionState.time = this.value"
+                onchange="window.handleTimeChange(this.value)"
               />
             </div>
           </div>
         </div>
 
         <div class="mt-auto pt-8 flex flex-col gap-4 select-none">
+          <div id="rendezvous-error" class="hidden text-[10px] text-red-500 uppercase font-bold text-center mb-2">
+            Please specify both vector and valid temporal window.
+          </div>
           <div class="bg-white/5 border border-white/10 p-4 rounded-lg flex items-start gap-4">
             <div class="w-1 h-12 bg-white/40 rounded-full"></div>
             <p class="text-[10px] text-gray-400 uppercase leading-relaxed tracking-wider">
@@ -175,9 +179,9 @@ export const Rendezvous = () => {
           </div>
 
           <button
+            id="confirm-rendezvous"
             class="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.2em] hover:bg-gray-200 transition-all duration-300 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98] cursor-pointer"
-            hx-get="/step/6"
-            hx-target="#ui-layer"
+            onclick="window.validateAndProceed(event)"
           >
             Confirm Rendezvous
           </button>
@@ -415,6 +419,47 @@ export const Rendezvous = () => {
                             });
                         } else {
                             alert("Geolocation is not supported by your browser.");
+                        }
+                    };
+
+                    window.handleTimeChange = (val) => {
+                        if (!window.MissionState) window.MissionState = {};
+                        window.MissionState.time = val;
+                        
+                        const timeError = document.getElementById('time-error');
+                        const selectedTime = new Date(val).getTime();
+                        const minTime = Date.now() + 3600000; // 1 hour from now
+
+                        if (selectedTime < minTime) {
+                            timeError.classList.remove('hidden');
+                        } else {
+                            timeError.classList.add('hidden');
+                        }
+                    };
+
+                    window.validateAndProceed = (e) => {
+                        const state = window.MissionState;
+                        const errorEl = document.getElementById('rendezvous-error');
+                        const timeError = document.getElementById('time-error');
+                        
+                        const hasLocation = state?.location && (state.location.lat !== 0 || state.location.lng !== 0);
+                        const selectedTime = new Date(state?.time).getTime();
+                        const minTime = Date.now() + 3600000;
+                        const hasValidTime = state?.time && selectedTime >= minTime;
+
+                        if (hasLocation && hasValidTime) {
+                            errorEl.classList.add('hidden');
+                            htmx.ajax('GET', '/step/6', '#ui-layer');
+                        } else {
+                            errorEl.classList.remove('hidden');
+                            if (!hasValidTime && state?.time) timeError.classList.remove('hidden');
+                            
+                            // Visual feedback
+                            const btn = e.target;
+                            btn.classList.add('bg-red-500', 'text-white');
+                            setTimeout(() => {
+                                btn.classList.remove('bg-red-500', 'text-white');
+                            }, 1000);
                         }
                     };
 

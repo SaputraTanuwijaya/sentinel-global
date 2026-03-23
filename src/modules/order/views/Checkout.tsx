@@ -40,7 +40,7 @@ export const Checkout = () => {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-7xl w-full z-10 pb-20">
-        {/* LEFT COLUMN: Summary & Duration */}
+        {/* LEFT COLUMN */}
         <div class="flex flex-col gap-8">
           <div class="glass-panel p-8 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-6">
             <h3 class="text-white font-bold uppercase tracking-widest text-sm border-b border-white/10 pb-4 flex items-center gap-2">
@@ -113,7 +113,7 @@ export const Checkout = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Payment */}
+        {/* RIGHT COLUMN */}
         <div class="glass-panel p-8 rounded-2xl bg-black/40 border border-white/10 flex flex-col gap-8">
           <div class="flex flex-col gap-2">
             <h3 class="text-white font-bold uppercase tracking-widest text-sm flex items-center gap-2">
@@ -133,22 +133,32 @@ export const Checkout = () => {
             hx-target="#ui-layer"
             onsubmit="window.handleDeployment(event)"
           >
+            {/* Cardholder Name */}
             <div class="flex flex-col gap-2">
-              <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
+              <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold flex justify-between">
                 Cardholder Name
+                <span id="name-error" class="text-red-500 hidden">
+                  REQUIRED
+                </span>
               </label>
               <input
                 type="text"
                 name="cardname"
+                id="cardname"
                 placeholder="OPERATOR NAME"
                 class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm"
                 required
+                oninput="this.value=this.value.toUpperCase(); document.getElementById('name-error').classList.add('hidden');"
               />
             </div>
 
+            {/* Card Number — 4 inputs, auto-advance via oninput, retreat via cardNav keydown */}
             <div class="flex flex-col gap-2">
-              <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
+              <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold flex justify-between">
                 Card Number
+                <span id="card-error" class="text-red-500 hidden">
+                  INCOMPLETE
+                </span>
               </label>
               <div class="flex items-center gap-2">
                 <input
@@ -158,8 +168,7 @@ export const Checkout = () => {
                   maxlength="4"
                   placeholder="XXXX"
                   class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
-                  onkeydown="window.cardNav(event, '', 'cn2')"
-                  oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn2').focus();"
+                  oninput="this.value=this.value.replace(/\D/g,''); document.getElementById('card-error').classList.add('hidden'); if(this.value.length===4) document.getElementById('cn2').focus();"
                 />
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
@@ -169,8 +178,8 @@ export const Checkout = () => {
                   maxlength="4"
                   placeholder="XXXX"
                   class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
-                  onkeydown="window.cardNav(event, 'cn1', 'cn3')"
                   oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn3').focus();"
+                  onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('cn1').focus();"
                 />
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
@@ -180,8 +189,8 @@ export const Checkout = () => {
                   maxlength="4"
                   placeholder="XXXX"
                   class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
-                  onkeydown="window.cardNav(event, 'cn2', 'cn4')"
                   oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('cn4').focus();"
+                  onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('cn2').focus();"
                 />
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
@@ -191,16 +200,20 @@ export const Checkout = () => {
                   maxlength="4"
                   placeholder="XXXX"
                   class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-widest"
-                  onkeydown="window.cardNav(event, 'cn3', 'expiry-mm')"
                   oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===4) document.getElementById('expiry-mm').focus();"
+                  onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('cn3').focus();"
                 />
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-6">
+              {/* Expiry — two inputs, proven working */}
               <div class="flex flex-col gap-2">
-                <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
+                <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold flex justify-between">
                   Expiry Date
+                  <span id="expiry-error" class="text-red-500 hidden">
+                    INVALID
+                  </span>
                 </label>
                 <div class="flex items-center gap-2">
                   <input
@@ -209,9 +222,22 @@ export const Checkout = () => {
                     id="expiry-mm"
                     placeholder="MM"
                     maxlength="2"
-                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
-                    oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===2) document.getElementById('expiry-yy').focus();"
-                    onkeydown="window.cardNav(event, 'cn4', 'expiry-yy')"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
+                    oninput="
+                      this.value=this.value.replace(/\D/g,'');
+                      document.getElementById('expiry-error').classList.add('hidden');
+                      if(this.value.length===2){
+                        const mm=parseInt(this.value);
+                        if(mm<1||mm>12){
+                          document.getElementById('expiry-error').innerText='INVALID MM';
+                          document.getElementById('expiry-error').classList.remove('hidden');
+                          this.value='';
+                        } else {
+                          document.getElementById('expiry-yy').focus();
+                        }
+                      }
+                    "
+                    onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('cn4').focus();"
                   />
                   <span class="text-white/30 font-mono">/</span>
                   <input
@@ -220,26 +246,70 @@ export const Checkout = () => {
                     id="expiry-yy"
                     placeholder="YY"
                     maxlength="2"
-                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center"
                     oninput="this.value=this.value.replace(/\D/g,''); if(this.value.length===2) document.getElementById('cvc').focus();"
-                    onkeydown="window.cardNav(event, 'expiry-mm', 'cvc')"
+                    onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('expiry-mm').focus();"
                   />
                 </div>
               </div>
+
+              {/* CVC with visibility toggle */}
               <div class="flex flex-col gap-2">
-                <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">
+                <label class="text-[9px] text-gray-400 uppercase tracking-widest font-bold flex justify-between">
                   Security Code
+                  <span id="cvc-error" class="text-red-500 hidden">
+                    3 DIGITS
+                  </span>
                 </label>
-                <input
-                  type="password"
-                  name="cvc"
-                  id="cvc"
-                  placeholder="***"
-                  maxlength="3"
-                  class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-[0.5em]"
-                  oninput="this.value=this.value.replace(/\D/g,'')"
-                  required
-                />
+                <div class="relative">
+                  <input
+                    type="password"
+                    name="cvc"
+                    id="cvc"
+                    placeholder="***"
+                    maxlength="3"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-4 pr-12 text-white placeholder-white/10 focus:outline-none focus:border-sentinel-accent transition-all font-mono text-sm text-center tracking-[0.5em]"
+                    required
+                    oninput="this.value=this.value.replace(/\D/g,''); document.getElementById('cvc-error').classList.toggle('hidden', this.value.length===3);"
+                    onkeydown="if(event.key==='Backspace'&&this.value==='') document.getElementById('expiry-yy').focus();"
+                  />
+                  <button
+                    type="button"
+                    onclick="window.toggleCvc()"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white transition-colors cursor-pointer"
+                    title="Toggle visibility"
+                  >
+                    <svg
+                      id="icon-eye-open"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                    <svg
+                      id="icon-eye-closed"
+                      class="hidden"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -280,144 +350,142 @@ export const Checkout = () => {
       <script>
         {`
           (function() {
-            // Guard function registration only — NOT the init calls below
-            if (!window.__checkoutFnsRegistered) {
-              window.__checkoutFnsRegistered = true;
-
-              const PRICING: { [key: string]: any } = {
-                PRINCIPAL: 80,
-                TIERS: {
-                  'Vanguard': 0,
-                  'Sentinel': 150,
-                  'Praetorian': 400
-                } as { [key: string]: number },
-                MOTORCADE: {
-                  'PRINCIPAL': 100,
-                  'SWEEPER': 30,
-                  'LEAD': 70,
-                  'CAT': 150,
-                  'ECM': 200,
-                  'REAR': 70
-                } as { [key: string]: number }
-              };
-
-              window.cardNav = (e, prevId, nextId) => {
-                const input = e.target;
-                // Block non-digit, non-control keys
-                if (
-                  !/^\d$/.test(e.key) &&
-                  !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) &&
-                  !e.metaKey &&
-                  !e.ctrlKey
-                ) {
-                  e.preventDefault();
-                  return;
-                }
-                // Auto-advance when field is full and a digit was just typed
-                if (/^\d$/.test(e.key) && input.value.length === parseInt(input.maxLength) && nextId) {
-                  setTimeout(() => document.getElementById(nextId)?.focus(), 0);
-                }
-                // Auto-retreat on backspace from empty field
-                if (e.key === 'Backspace' && input.value === '' && prevId) {
-                  e.preventDefault();
-                  document.getElementById(prevId)?.focus();
-                }
-              };
-
-              window.updateDuration = (val) => {
-                window.MissionState.hours = parseInt(val);
-                document.getElementById('duration-display').innerText = val + ' HRS';
-                window.updateCheckoutTotals();
-                document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
-              };
-
-              window.updateCheckoutTotals = () => {
-                const state = window.MissionState;
-                const summaryEl = document.getElementById('checkout-summary-content');
-                const hourlyEl = document.getElementById('checkout-hourly-rate');
-                const grandEl = document.getElementById('checkout-grand-total');
-
-                if (!summaryEl || !state) return;
-
-                let hourlyTotal = 0;
-                let html = '';
-
-                const pCost = (state.principalCount || 0) * PRICING.PRINCIPAL;
-                hourlyTotal += pCost;
-                html += \`
-                  <div class="flex justify-between items-center">
-                    <span class="text-gray-500 uppercase tracking-tighter">Principals (x\${state.principalCount})</span>
-                    <span class="text-white">$\${pCost.toLocaleString()}</span>
-                  </div>
-                \`;
-
-                const tCost = (PRICING.TIERS as { [key: string]: number })[state.tierName] || 0;
-                hourlyTotal += tCost;
-                html += \`
-                  <div class="flex justify-between items-center">
-                    <span class="text-gray-500 uppercase tracking-tighter">Security Tier (\${state.tierName})</span>
-                    <span class="text-white">+$\${tCost.toLocaleString()}</span>
-                  </div>
-                \`;
-
-                let mCost = 0;
-                if (state.motorcade) {
-                  Object.values(state.motorcade).forEach((v: any) => {
-                    if (v.id !== 'none') {
-                      const unitPrice = (PRICING.MOTORCADE as { [key: string]: number })[v.role] || 0;
-                      mCost += v.amount * unitPrice;
-                    }
-                  });
-                }
-
-                if (mCost > 0) {
-                  hourlyTotal += mCost;
-                  html += \`
-                    <div class="flex justify-between items-center">
-                      <span class="text-gray-500 uppercase tracking-tighter">Motorcade Assets</span>
-                      <span class="text-white">+$\${mCost.toLocaleString()}</span>
-                    </div>
-                  \`;
-                }
-
-                summaryEl.innerHTML = html;
-                hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
-                grandEl.innerText = \`$\${(hourlyTotal * state.hours).toLocaleString()} USD\`;
-              };
-
-              window.handleDeployment = (e) => {
-                const form = e.target;
-
-                // Merge 4 card segments — use getElementById, no querySelector template literal nesting
-                const cardNumber = ['cn1', 'cn2', 'cn3', 'cn4']
-                  .map(id => (document.getElementById(id) as HTMLInputElement)?.value || '')
-                  .join('');
-                const cardInput = document.createElement('input');
-                cardInput.type = 'hidden';
-                cardInput.name = 'cardnumber';
-                cardInput.value = cardNumber;
-                form.appendChild(cardInput);
-
-                // Merge expiry
-                const mm = (document.getElementById('expiry-mm') as HTMLInputElement)?.value || '';
-                const yy = (document.getElementById('expiry-yy') as HTMLInputElement)?.value || '';
-                const expiryInput = document.createElement('input');
-                expiryInput.type = 'hidden';
-                expiryInput.name = 'expiry';
-                expiryInput.value = mm + '/' + yy;
-                form.appendChild(expiryInput);
-
-                // MissionState
-                const stateInput = document.createElement('input');
-                stateInput.type = 'hidden';
-                stateInput.name = 'missionState';
-                stateInput.value = JSON.stringify(window.MissionState);
-                form.appendChild(stateInput);
-              };
-            }
-
-            // These run every swap, not just once
             if (!window.MissionState) window.MissionState = { hours: 6 };
+
+            const PRICING = {
+              PRINCIPAL: 80,
+              TIERS: { 'Vanguard': 0, 'Sentinel': 150, 'Praetorian': 400 },
+              MOTORCADE: { 'PRINCIPAL': 100, 'SWEEPER': 30, 'LEAD': 70, 'CAT': 150, 'ECM': 200, 'REAR': 70 }
+            };
+
+            window.toggleCvc = () => {
+              const cvc = document.getElementById('cvc');
+              const eyeOpen = document.getElementById('icon-eye-open');
+              const eyeClosed = document.getElementById('icon-eye-closed');
+              const revealing = cvc.type === 'password';
+              cvc.type = revealing ? 'text' : 'password';
+              eyeOpen.classList.toggle('hidden', revealing);
+              eyeClosed.classList.toggle('hidden', !revealing);
+            };
+
+            window.updateDuration = (val) => {
+              window.MissionState.hours = parseInt(val);
+              document.getElementById('duration-display').innerText = val + ' HRS';
+              window.updateCheckoutTotals();
+              document.body.dispatchEvent(new CustomEvent('mission-state-updated'));
+            };
+
+            window.updateCheckoutTotals = () => {
+              const state = window.MissionState;
+              const summaryEl = document.getElementById('checkout-summary-content');
+              const hourlyEl = document.getElementById('checkout-hourly-rate');
+              const grandEl = document.getElementById('checkout-grand-total');
+              if (!summaryEl || !state) return;
+
+              let hourlyTotal = 0;
+              let html = '';
+
+              const pCost = (state.principalCount || 0) * PRICING.PRINCIPAL;
+              hourlyTotal += pCost;
+              html += \`
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-500 uppercase tracking-tighter">Principals (x\${state.principalCount || 0})</span>
+                  <span class="text-white">$\${pCost.toLocaleString()}</span>
+                </div>
+              \`;
+
+              const tCost = PRICING.TIERS[state.tierName] || 0;
+              hourlyTotal += tCost;
+              html += \`
+                <div class="flex justify-between items-center">
+                  <span class="text-gray-500 uppercase tracking-tighter">Security Tier (\${state.tierName || 'None'})</span>
+                  <span class="text-white">+$\${tCost.toLocaleString()}</span>
+                </div>
+              \`;
+
+              let mCost = 0;
+              if (state.motorcade) {
+                Object.values(state.motorcade).forEach((v) => {
+                  if (v.id !== 'none') {
+                    const unitPrice = PRICING.MOTORCADE[v.role] || 0;
+                    mCost += v.amount * unitPrice;
+                  }
+                });
+              }
+              if (mCost > 0) {
+                hourlyTotal += mCost;
+                html += \`
+                  <div class="flex justify-between items-center">
+                    <span class="text-gray-500 uppercase tracking-tighter">Motorcade Assets</span>
+                    <span class="text-white">+$\${mCost.toLocaleString()}</span>
+                  </div>
+                \`;
+              }
+
+              summaryEl.innerHTML = html;
+              hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
+              grandEl.innerText = \`$\${(hourlyTotal * (state.hours || 6)).toLocaleString()} USD\`;
+            };
+
+            window.handleDeployment = (e) => {
+              e.preventDefault();
+              const form = e.target;
+
+              const name = document.getElementById('cardname').value.trim();
+              const cn1  = document.getElementById('cn1').value;
+              const cn2  = document.getElementById('cn2').value;
+              const cn3  = document.getElementById('cn3').value;
+              const cn4  = document.getElementById('cn4').value;
+              const mm   = document.getElementById('expiry-mm').value;
+              const yy   = document.getElementById('expiry-yy').value;
+              const cvc  = document.getElementById('cvc').value;
+
+              const cardNumber = cn1 + cn2 + cn3 + cn4;
+              let valid = true;
+
+              if (!name) {
+                document.getElementById('name-error').classList.remove('hidden');
+                valid = false;
+              }
+              if (cardNumber.length !== 16) {
+                document.getElementById('card-error').classList.remove('hidden');
+                valid = false;
+              }
+              if (mm.length !== 2 || yy.length !== 2) {
+                document.getElementById('expiry-error').classList.remove('hidden');
+                valid = false;
+              }
+              if (cvc.length !== 3) {
+                document.getElementById('cvc-error').classList.remove('hidden');
+                valid = false;
+              }
+
+              if (!valid) {
+                const btn = form.querySelector('button[type="submit"]');
+                btn.classList.add('bg-red-500', 'text-white');
+                setTimeout(() => btn.classList.remove('bg-red-500', 'text-white'), 1000);
+                return;
+              }
+
+              // Inject merged hidden inputs for the backend
+              const inject = (fieldName, value) => {
+                const el = document.createElement('input');
+                el.type = 'hidden';
+                el.name = fieldName;
+                el.value = value;
+                form.appendChild(el);
+              };
+              inject('cardnumber', cardNumber);
+              inject('expiry', mm + '/' + yy);
+              inject('missionState', JSON.stringify(window.MissionState));
+
+              // Manual HTMX trigger since we called preventDefault
+              htmx.ajax('POST', '/api/checkout', {
+                target: '#ui-layer',
+                values: new FormData(form)
+              });
+            };
+
             if (window.Sentinel) window.Sentinel.changeBackground('black');
             window.updateCheckoutTotals();
           })();
