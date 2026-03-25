@@ -428,7 +428,6 @@ export const Checkout = () => {
             };
 
             window.handleDeployment = (e) => {
-              e.preventDefault();
               const form = e.target;
 
               const name = document.getElementById('cardname').value.trim();
@@ -443,31 +442,20 @@ export const Checkout = () => {
               const cardNumber = cn1 + cn2 + cn3 + cn4;
               let valid = true;
 
-              if (!name) {
-                document.getElementById('name-error').classList.remove('hidden');
-                valid = false;
-              }
-              if (cardNumber.length !== 16) {
-                document.getElementById('card-error').classList.remove('hidden');
-                valid = false;
-              }
-              if (mm.length !== 2 || yy.length !== 2) {
-                document.getElementById('expiry-error').classList.remove('hidden');
-                valid = false;
-              }
-              if (cvc.length !== 3) {
-                document.getElementById('cvc-error').classList.remove('hidden');
-                valid = false;
-              }
+              if (!name) { document.getElementById('name-error').classList.remove('hidden'); valid = false; }
+              if (cardNumber.length !== 16) { document.getElementById('card-error').classList.remove('hidden'); valid = false; }
+              if (mm.length !== 2 || yy.length !== 2) { document.getElementById('expiry-error').classList.remove('hidden'); valid = false; }
+              if (cvc.length !== 3) { document.getElementById('cvc-error').classList.remove('hidden'); valid = false; }
 
               if (!valid) {
+                e.preventDefault(); 
                 const btn = form.querySelector('button[type="submit"]');
                 btn.classList.add('bg-red-500', 'text-white');
                 setTimeout(() => btn.classList.remove('bg-red-500', 'text-white'), 1000);
                 return;
               }
 
-              // Inject merged hidden inputs for the backend
+              // HTMX ht-post
               const inject = (fieldName, value) => {
                 const el = document.createElement('input');
                 el.type = 'hidden';
@@ -475,15 +463,10 @@ export const Checkout = () => {
                 el.value = value;
                 form.appendChild(el);
               };
+              
               inject('cardnumber', cardNumber);
               inject('expiry', mm + '/' + yy);
               inject('missionState', JSON.stringify(window.MissionState));
-
-              // Manual HTMX trigger since we called preventDefault
-              htmx.ajax('POST', '/api/checkout', {
-                target: '#ui-layer',
-                values: new FormData(form)
-              });
             };
 
             if (window.Sentinel) window.Sentinel.changeBackground('black');

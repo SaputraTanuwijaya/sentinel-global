@@ -1,6 +1,5 @@
 import { SceneManager } from "./SceneManager";
 
-// Only initialize the 3D engine once the DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
   const engine = SceneManager.getInstance();
 
@@ -8,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   (window as any).Sentinel = engine;
 
-  // Listen for HTMX Events
   document.body.addEventListener("sentinel-bg-change", (e: any) => {
     const theme = e.detail.theme;
     if (theme) {

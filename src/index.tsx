@@ -10,6 +10,8 @@ import { Motorcade } from "./modules/order/views/Motorcade";
 import { Rendezvous } from "./modules/order/views/Rendezvous";
 import { Checkout } from "./modules/order/views/Checkout";
 
+import { db } from "./core/db";
+
 const app = new Elysia()
   .use(html())
   .use(staticPlugin({ assets: "src/public", prefix: "/public" }))
@@ -55,40 +57,110 @@ const app = new Elysia()
   .get("/step/4", () => <Motorcade />)
   .get("/step/5", () => <Rendezvous />)
   .get("/step/6", () => <Checkout />)
-  .post("/api/checkout", ({ body }) => {
-    console.log("Deployment Confirmed:", body);
-    return (
-      <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 text-center animate-fade-in">
-        <div class="w-24 h-24 rounded-full border-2 border-sentinel-accent flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(255,215,0,0.2)]">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="w-12 h-12 text-sentinel-accent"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+  .post("/api/checkout", async ({ body }) => {
+    try {
+      const payload = body as any;
+      const state = JSON.parse(payload.missionState);
+
+      const PRICING = {
+        PRINCIPAL: 80,
+        TIERS: { Vanguard: 0, Sentinel: 150, Praetorian: 400 },
+        MOTORCADE: {
+          PRINCIPAL: 100,
+          SWEEPER: 30,
+          LEAD: 70,
+          CAT: 150,
+          ECM: 200,
+          REAR: 70,
+        },
+      } as any;
+
+      const pCount = Number(state.principalCount) || 1;
+      const tName = state.tierName || "Vanguard";
+      const duration = Number(state.hours) || 6;
+
+      let hourlyTotal = pCount * PRICING.PRINCIPAL;
+      hourlyTotal += PRICING.TIERS[tName] || 0;
+
+      let mCost = 0;
+      if (state.motorcade) {
+        Object.values(state.motorcade).forEach((v: any) => {
+          if (v.id !== "none") {
+            mCost +=
+              (Number(v.amount) || 0) *
+              (Number(PRICING.MOTORCADE[v.role]) || 0);
+          }
+        });
+      }
+      hourlyTotal += mCost;
+
+      const totalCostCents = Math.round(hourlyTotal * duration * 100);
+      const missionId =
+        "OP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      await db.execute({
+        sql: `INSERT INTO missions (
+            id, user_email, principal_count, tier_name, dress_code_id, 
+            motorcade_json, total_cost_cents, duration_hours, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          missionId,
+          "guest-operator@sentinel.local",
+          pCount,
+          tName,
+          state.dressCode || "business_formal",
+          JSON.stringify(state.motorcade || {}),
+          totalCostCents,
+          duration,
+          "authorized",
+        ],
+      });
+
+      console.log(`[TURSO] Mission ${missionId} saved successfully.`);
+
+      return (
+        <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 text-center animate-fade-in relative z-[100]">
+          <div class="w-24 h-24 rounded-full border-2 border-sentinel-accent flex items-center justify-center mb-8 shadow-[0_0_30px_rgba(255,215,0,0.2)]">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-12 h-12 text-sentinel-accent"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <h1 class="text-4xl text-white font-bold mb-4 font-mono tracking-[0.3em] uppercase">
+            Deployment Authorized
+          </h1>
+          <p class="text-gray-400 mb-2 font-mono uppercase tracking-widest text-sm px-12">
+            Tactical units are en-route to rendezvous coordinates.
+          </p>
+          <p class="text-sentinel-accent mb-12 font-mono uppercase tracking-widest text-xs px-12">
+            Mission Ledger ID: {missionId}
+          </p>
+          <button
+            class="px-10 py-4 border border-white/20 text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer pointer-events-auto"
+            onclick="window.location.href='/'"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
+            Return to HQ
+          </button>
         </div>
-        <h1 class="text-4xl text-white font-bold mb-4 font-mono tracking-[0.3em] uppercase">
-          Deployment Authorized
-        </h1>
-        <p class="text-gray-400 mb-12 font-mono uppercase tracking-widest text-sm px-12">
-          Tactical units are en-route to rendezvous coordinates. Deployment Window Locked.
-        </p>
-        <button
-          class="px-10 py-4 border border-white/20 text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer pointer-events-auto"
-          onclick="window.location.href='/'"
-        >
-          Return to HQ
-        </button>
-      </div>
-    );
+      );
+    } catch (error: any) {
+      console.error("/// TURSO INSERTION FAILED ///", error.message || error);
+      return (
+        <div class="flex items-center justify-center h-full w-full bg-red-900 text-white pointer-events-auto z-[100]">
+          <h1 class="text-2xl font-mono">DATABASE ERROR. CHECK TERMINAL.</h1>
+        </div>
+      );
+    }
   })
   .listen(3000);
 
