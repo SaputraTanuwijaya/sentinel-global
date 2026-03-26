@@ -10,7 +10,11 @@ import { Motorcade } from "./modules/order/views/Motorcade";
 import { Rendezvous } from "./modules/order/views/Rendezvous";
 import { Checkout } from "./modules/order/views/Checkout";
 
+import { AdminDashboard } from "./views/Admin";
+
 import { db } from "./core/db";
+
+import { MissionService } from "./services/MissionService";
 
 const app = new Elysia()
   .use(html())
@@ -62,61 +66,7 @@ const app = new Elysia()
       const payload = body as any;
       const state = JSON.parse(payload.missionState);
 
-      const PRICING = {
-        PRINCIPAL: 80,
-        TIERS: { Vanguard: 0, Sentinel: 150, Praetorian: 400 },
-        MOTORCADE: {
-          PRINCIPAL: 100,
-          SWEEPER: 30,
-          LEAD: 70,
-          CAT: 150,
-          ECM: 200,
-          REAR: 70,
-        },
-      } as any;
-
-      const pCount = Number(state.principalCount) || 1;
-      const tName = state.tierName || "Vanguard";
-      const duration = Number(state.hours) || 6;
-
-      let hourlyTotal = pCount * PRICING.PRINCIPAL;
-      hourlyTotal += PRICING.TIERS[tName] || 0;
-
-      let mCost = 0;
-      if (state.motorcade) {
-        Object.values(state.motorcade).forEach((v: any) => {
-          if (v.id !== "none") {
-            mCost +=
-              (Number(v.amount) || 0) *
-              (Number(PRICING.MOTORCADE[v.role]) || 0);
-          }
-        });
-      }
-      hourlyTotal += mCost;
-
-      const totalCostCents = Math.round(hourlyTotal * duration * 100);
-      const missionId =
-        "OP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-
-      await db.execute({
-        sql: `INSERT INTO missions (
-            id, user_email, principal_count, tier_name, dress_code_id, 
-            motorcade_json, total_cost_cents, duration_hours, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [
-          missionId,
-          "guest-operator@sentinel.local",
-          pCount,
-          tName,
-          state.dressCode || "business_formal",
-          JSON.stringify(state.motorcade || {}),
-          totalCostCents,
-          duration,
-          "authorized",
-        ],
-      });
-
-      console.log(`[TURSO] Mission ${missionId} saved successfully.`);
+      const missionId = await MissionService.processDeployment(state);
 
       return (
         <div class="flex flex-col items-center justify-center h-full w-full pointer-events-auto bg-black/90 text-center animate-fade-in relative z-[100]">
@@ -136,15 +86,19 @@ const app = new Elysia()
               />
             </svg>
           </div>
+
           <h1 class="text-4xl text-white font-bold mb-4 font-mono tracking-[0.3em] uppercase">
             Deployment Authorized
           </h1>
+
           <p class="text-gray-400 mb-2 font-mono uppercase tracking-widest text-sm px-12">
             Tactical units are en-route to rendezvous coordinates.
           </p>
+
           <p class="text-sentinel-accent mb-12 font-mono uppercase tracking-widest text-xs px-12">
             Mission Ledger ID: {missionId}
           </p>
+
           <button
             class="px-10 py-4 border border-white/20 text-white font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all cursor-pointer pointer-events-auto"
             onclick="window.location.href='/'"
@@ -161,6 +115,31 @@ const app = new Elysia()
         </div>
       );
     }
+  })
+  .get("/admin", async () => {
+    const result = await db.execute(
+      "SELECT * FROM missions ORDER BY created_at DESC",
+    );
+    const missions = result.rows;
+    return (
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+          />
+          <title>Sentinel Global | Overwatch</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <script>
+            {`tailwind.config = { theme: { extend: { colors: { 'sentinel-accent': '#d4af37' } } } }`}
+          </script>
+        </head>
+        <body class="bg-black overflow-x-hidden">
+          <AdminDashboard missions={missions} />
+        </body>
+      </html>
+    );
   })
   .listen(3000);
 
