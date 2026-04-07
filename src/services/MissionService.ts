@@ -1,4 +1,5 @@
 import { db } from "../core/db";
+import type { MissionState } from "../modules/order/models/Mission";
 
 export class MissionService {
   // Set Pricing as Centralized
@@ -15,7 +16,7 @@ export class MissionService {
     },
   };
 
-  public static async processDeployment(state: any) {
+  public static async processDeployment(state: MissionState) {
     const pCount = Number(state.principalCount) || 1;
     const tName = state.tierName || "Vanguard";
     const duration = Number(state.hours) || 6;
@@ -26,7 +27,7 @@ export class MissionService {
 
     let mCost = 0;
     if (state.motorcade) {
-      Object.values(state.motorcade).forEach((v: any) => {
+      Object.values(state.motorcade).forEach((v) => {
         if (v.id !== "none") {
           mCost +=
             (Number(v.amount) || 0) *
