@@ -43,8 +43,24 @@ export const authRouter = new Elysia({ prefix: "/auth" })
   .use(jwtPlugin) // makes `jwt` available for the unified login admin path
 
   // ── Email/password (or admin via email='admin') ──────────────────────────
-  .get("/login", () => <UserLoginPage />)
-  .get("/register", () => <RegisterPage />)
+  // If a boosted HTMX request arrives, the AuthLayout <head> would be discarded
+  // by the body-only swap, leaving auth styles missing until refresh. Returning
+  // HX-Refresh: true tells HTMX to do a full window.location reload, which then
+  // loads AuthLayout cleanly with its <head> intact.
+  .get("/login", ({ request, set }) => {
+    if (request.headers.get("HX-Request") === "true") {
+      set.headers["HX-Refresh"] = "true";
+      return "";
+    }
+    return <UserLoginPage />;
+  })
+  .get("/register", ({ request, set }) => {
+    if (request.headers.get("HX-Request") === "true") {
+      set.headers["HX-Refresh"] = "true";
+      return "";
+    }
+    return <RegisterPage />;
+  })
 
   .post(
     "/register",

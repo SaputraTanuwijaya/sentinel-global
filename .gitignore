@@ -3,9 +3,5 @@ node_modules/
 dist/
 .DS_Store
 *.log
-GEMINI.md
-Optimization_Plan.md
-AGENTS.md
-docs/
-.claude/
+
 

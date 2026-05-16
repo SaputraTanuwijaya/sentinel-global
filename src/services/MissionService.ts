@@ -68,8 +68,42 @@ export class MissionService {
 
   public static async getAllMissions() {
     const result = await db.execute(
-      "SELECT * FROM missions ORDER BY created_at DESC",
+      "SELECT * FROM missions ORDER BY created_at DESC LIMIT 200",
     );
     return result.rows;
   }
+
+  public static async getMission(id: string) {
+    const result = await db.execute({
+      sql: "SELECT * FROM missions WHERE id = ? LIMIT 1",
+      args: [id],
+    });
+    return result.rows[0] ?? null;
+  }
+
+  public static readonly ALLOWED_STATUS = [
+    "authorized",
+    "in_progress",
+    "complete",
+    "aborted",
+  ] as const;
+
+  public static async updateStatus(
+    id: string,
+    status: string,
+  ): Promise<MissionStatus> {
+    if (!MissionService.ALLOWED_STATUS.includes(status as MissionStatus)) {
+      throw new Error(`Invalid status: ${status}`);
+    }
+    const result = await db.execute({
+      sql: "UPDATE missions SET status = ? WHERE id = ? RETURNING status",
+      args: [status, id],
+    });
+    if (result.rows.length === 0) {
+      throw new Error(`Mission not found: ${id}`);
+    }
+    return status as MissionStatus;
+  }
 }
+
+export type MissionStatus = (typeof MissionService.ALLOWED_STATUS)[number];

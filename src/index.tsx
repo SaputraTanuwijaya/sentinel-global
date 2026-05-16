@@ -4,13 +4,12 @@ import { Elysia, redirect, t } from "elysia";
 import { html, Html } from "@elysiajs/html";
 import { staticPlugin } from "@elysiajs/static";
 import { Layout } from "./views/layout";
-import { AdminDashboard } from "./views/Admin";
 import { LoginPage } from "./views/Login";
-import { db } from "./core/db";
 import { env } from "./core/env";
-import { jwtPlugin, requireAdmin, userContext } from "./core/auth";
+import { jwtPlugin, userContext } from "./core/auth";
 import { orderRouter } from "./modules/order/router.tsx";
 import { authRouter } from "./modules/auth/router.tsx";
+import { adminRouter } from "./modules/admin/router.tsx";
 
 const app = new Elysia()
   .use(html())
@@ -19,6 +18,7 @@ const app = new Elysia()
   .use(userContext)
   .use(authRouter)
   .use(orderRouter)
+  .use(adminRouter)
 
   // ── Public ────────────────────────────────────────────────────────────────
 
@@ -77,14 +77,20 @@ const app = new Elysia()
             ) : (
               <div class="flex flex-col items-center gap-3">
                 <div class="flex gap-3">
+                  {/* hx-boost="false" forces a full-page nav so AuthLayout's
+                      <head> (style block + fonts) actually loads. With boost
+                      enabled, HTMX would AJAX-swap only the <body>, leaving
+                      auth-specific styles missing until the user refreshes. */}
                   <a
                     href="/auth/login"
+                    hx-boost="false"
                     class="px-6 py-3 bg-white text-black font-bold uppercase tracking-wider hover:bg-sentinel-accent transition-colors pointer-events-auto cursor-pointer"
                   >
                     Sign In
                   </a>
                   <a
                     href="/auth/register"
+                    hx-boost="false"
                     class="px-6 py-3 bg-zinc-900 border border-white/20 text-white font-bold uppercase tracking-wider hover:bg-white hover:text-black transition-colors pointer-events-auto cursor-pointer"
                   >
                     Register
@@ -158,38 +164,6 @@ const app = new Elysia()
     cookie.auth?.remove();
     return redirect("/login");
   })
-
-  // ── Admin (guarded) ───────────────────────────────────────────────────────
-
-  .get(
-    "/admin",
-    async () => {
-      const result = await db.execute(
-        "SELECT * FROM missions ORDER BY created_at DESC",
-      );
-      const missions = result.rows;
-      return (
-        <html lang="en">
-          <head>
-            <meta charset="UTF-8" />
-            <meta
-              name="viewport"
-              content="width=device-width, initial-scale=1.0"
-            />
-            <title>Sentinel Global | Overwatch</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <script>
-              {`tailwind.config = { theme: { extend: { colors: { 'sentinel-accent': '#d4af37' } } } }`}
-            </script>
-          </head>
-          <body class="bg-black overflow-x-hidden">
-            <AdminDashboard missions={missions} />
-          </body>
-        </html>
-      );
-    },
-    { beforeHandle: requireAdmin },
-  )
 
   .listen(3000);
 
