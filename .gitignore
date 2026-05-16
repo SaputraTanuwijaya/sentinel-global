@@ -5,3 +5,7 @@ dist/
 *.log
 GEMINI.md
 Optimization_Plan.md
+AGENTS.md
+docs/
+.claude/
+

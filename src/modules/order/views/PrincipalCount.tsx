@@ -7,10 +7,11 @@ export const PrincipalCount = () => {
       <div class="absolute top-12 w-full px-12 flex items-center justify-between z-10">
         {/* Back Button Integrated */}
         <button
-          class="p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto"
+          class="p-3 rounded-full bg-black/50 border border-white/20 text-white hover:bg-white hover:text-black transition-all backdrop-blur-md group flex items-center gap-2 px-5 pointer-events-auto cursor-pointer"
           hx-get="/"
           hx-target="body"
           hx-push-url="true"
+          onclick="if(window.Sentinel) window.Sentinel.updatePrincipals(0);"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
