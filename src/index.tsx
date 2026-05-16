@@ -1,15 +1,23 @@
-import { Elysia } from "elysia";
+import "./core/env"; // boot-time validation — throws on missing vars
+import { timingSafeEqual } from "crypto";
+import { Elysia, t } from "elysia";
 import { html, Html } from "@elysiajs/html";
 import { staticPlugin } from "@elysiajs/static";
 import { Layout } from "./views/layout";
 import { AdminDashboard } from "./views/Admin";
+import { LoginPage } from "./views/Login";
 import { db } from "./core/db";
+import { env } from "./core/env";
+import { jwtPlugin, requireAdmin } from "./core/auth";
 import { orderRouter } from "./modules/order/router.tsx";
 
 const app = new Elysia()
   .use(html())
   .use(staticPlugin({ assets: "src/public", prefix: "/public" }))
+  .use(jwtPlugin)
   .use(orderRouter)
+
+  // ── Public ────────────────────────────────────────────────────────────────
 
   .get("/", () => (
     <Layout>
@@ -46,31 +54,86 @@ const app = new Elysia()
     </Layout>
   ))
 
-  .get("/admin", async () => {
-    const result = await db.execute(
-      "SELECT * FROM missions ORDER BY created_at DESC",
-    );
-    const missions = result.rows;
-    return (
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1.0"
-          />
-          <title>Sentinel Global | Overwatch</title>
-          <script src="https://cdn.tailwindcss.com"></script>
-          <script>
-            {`tailwind.config = { theme: { extend: { colors: { 'sentinel-accent': '#d4af37' } } } }`}
-          </script>
-        </head>
-        <body class="bg-black overflow-x-hidden">
-          <AdminDashboard missions={missions} />
-        </body>
-      </html>
-    );
+  // ── Auth ──────────────────────────────────────────────────────────────────
+
+  .get("/login", ({ cookie, set }) => {
+    if (cookie.auth?.value) {
+      set.redirect = "/admin";
+      return;
+    }
+    return <LoginPage />;
   })
+
+  .post(
+    "/api/login",
+    async ({ jwt, cookie, body, set }) => {
+      const pwdBuf = Buffer.from(body.password);
+      const expectedBuf = Buffer.from(env.ADMIN_PASSWORD);
+
+      // Always run a fixed-length comparison to prevent timing attacks
+      const safeLen = Math.max(pwdBuf.length, expectedBuf.length);
+      const a = Buffer.alloc(safeLen);
+      const b = Buffer.alloc(safeLen);
+      pwdBuf.copy(a);
+      expectedBuf.copy(b);
+      const match =
+        pwdBuf.length === expectedBuf.length && timingSafeEqual(a, b);
+
+      if (!match) {
+        set.status = 401;
+        return <LoginPage error="Invalid access key." />;
+      }
+
+      const token = await jwt.sign({ sub: "admin" });
+      cookie.auth.set({
+        value: token,
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 12,
+        secure: env.NODE_ENV === "production",
+      });
+
+      set.redirect = "/admin";
+    },
+    { body: t.Object({ password: t.String() }) },
+  )
+
+  .post("/api/logout", ({ cookie, set }) => {
+    cookie.auth.remove();
+    set.redirect = "/login";
+  })
+
+  // ── Admin (guarded) ───────────────────────────────────────────────────────
+
+  .guard({ beforeHandle: requireAdmin }, (app) =>
+    app.get("/admin", async () => {
+      const result = await db.execute(
+        "SELECT * FROM missions ORDER BY created_at DESC",
+      );
+      const missions = result.rows;
+      return (
+        <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1.0"
+            />
+            <title>Sentinel Global | Overwatch</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <script>
+              {`tailwind.config = { theme: { extend: { colors: { 'sentinel-accent': '#d4af37' } } } }`}
+            </script>
+          </head>
+          <body class="bg-black overflow-x-hidden">
+            <AdminDashboard missions={missions} />
+          </body>
+        </html>
+      );
+    }),
+  )
+
   .listen(3000);
 
 console.log(
