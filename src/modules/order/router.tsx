@@ -8,9 +8,13 @@ import { Rendezvous } from "./views/Rendezvous";
 import { Checkout } from "./views/Checkout";
 import { CheckoutSuccess } from "./views/CheckoutSuccess";
 import { MissionService } from "../../services/MissionService";
+import { requireUserApi, userContext } from "../../core/auth";
 import type { MissionState } from "./models/Mission";
 
+// Wizard steps stay open to guests (browse-and-build).
+// Checkout is gated — see requireUserApi.
 export const orderRouter = new Elysia()
+  .use(userContext) // adds per-request `user` from session cookie
   .get("/step/1", () => <PrincipalCount />)
   .get("/step/2", () => <GuardSelection />)
   .get("/step/3", () => <DressCode />)
@@ -19,10 +23,11 @@ export const orderRouter = new Elysia()
   .get("/step/6", () => <Checkout />)
   .post(
     "/api/checkout",
-    async ({ body }) => {
+    async ({ body, user }) => {
       try {
+        // Non-null asserted — requireUserApi beforeHandle guarantees this.
         const state: MissionState = JSON.parse(body.missionState);
-        const missionId = await MissionService.processDeployment(state);
+        const missionId = await MissionService.processDeployment(state, user!.email);
         return <CheckoutSuccess missionId={missionId} />;
       } catch (error: any) {
         console.error("/// TURSO INSERTION FAILED ///", error.message || error);
@@ -34,6 +39,7 @@ export const orderRouter = new Elysia()
       }
     },
     {
+      beforeHandle: requireUserApi,
       body: t.Object({
         cardname: t.String(),
         cardnumber: t.String(),

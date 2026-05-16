@@ -6,6 +6,7 @@
     --font-sans: "Inter", sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
       "Courier New", monospace;
+    --color-red-400: oklch(70.4% 0.191 22.216);
     --color-red-500: oklch(63.7% 0.237 25.331);
     --color-red-900: oklch(39.6% 0.141 25.723);
     --color-yellow-500: oklch(79.5% 0.184 86.047);
@@ -25,7 +26,7 @@
     --color-black: #000;
     --color-white: #fff;
     --spacing: 0.25rem;
-    --container-md: 28rem;
+    --container-sm: 24rem;
     --container-2xl: 42rem;
     --container-3xl: 48rem;
     --container-6xl: 72rem;
@@ -379,6 +380,9 @@
   .my-4 {
     margin-block: calc(var(--spacing) * 4);
   }
+  .my-6 {
+    margin-block: calc(var(--spacing) * 6);
+  }
   .-mt-1 {
     margin-top: calc(var(--spacing) * -1);
   }
@@ -388,8 +392,14 @@
   .mt-2 {
     margin-top: calc(var(--spacing) * 2);
   }
+  .mt-3 {
+    margin-top: calc(var(--spacing) * 3);
+  }
   .mt-4 {
     margin-top: calc(var(--spacing) * 4);
+  }
+  .mt-8 {
+    margin-top: calc(var(--spacing) * 8);
   }
   .mt-16 {
     margin-top: calc(var(--spacing) * 16);
@@ -417,6 +427,9 @@
   }
   .mb-8 {
     margin-bottom: calc(var(--spacing) * 8);
+  }
+  .mb-10 {
+    margin-bottom: calc(var(--spacing) * 10);
   }
   .mb-12 {
     margin-bottom: calc(var(--spacing) * 12);
@@ -463,17 +476,11 @@
   .h-6 {
     height: calc(var(--spacing) * 6);
   }
-  .h-8 {
-    height: calc(var(--spacing) * 8);
-  }
   .h-10 {
     height: calc(var(--spacing) * 10);
   }
   .h-12 {
     height: calc(var(--spacing) * 12);
-  }
-  .h-16 {
-    height: calc(var(--spacing) * 16);
   }
   .h-20 {
     height: calc(var(--spacing) * 20);
@@ -528,9 +535,6 @@
   }
   .w-12 {
     width: calc(var(--spacing) * 12);
-  }
-  .w-16 {
-    width: calc(var(--spacing) * 16);
   }
   .w-20 {
     width: calc(var(--spacing) * 20);
@@ -589,8 +593,8 @@
   .max-w-7xl {
     max-width: var(--container-7xl);
   }
-  .max-w-md {
-    max-width: var(--container-md);
+  .max-w-sm {
+    max-width: var(--container-sm);
   }
   .flex-1 {
     flex: 1;
@@ -1238,6 +1242,10 @@
     --tw-tracking: 0.5em;
     letter-spacing: 0.5em;
   }
+  .tracking-\[0\.25em\] {
+    --tw-tracking: 0.25em;
+    letter-spacing: 0.25em;
+  }
   .tracking-normal {
     --tw-tracking: var(--tracking-normal);
     letter-spacing: var(--tracking-normal);
@@ -1283,6 +1291,9 @@
   .text-green-400 {
     color: var(--color-green-400);
   }
+  .text-red-400 {
+    color: var(--color-red-400);
+  }
   .text-red-500 {
     color: var(--color-red-500);
   }
@@ -1325,6 +1336,9 @@
       color: color-mix(in oklab, var(--color-white) 60%, transparent);
     }
   }
+  .text-zinc-900 {
+    color: var(--color-zinc-900);
+  }
   .normal-case {
     text-transform: none;
   }
@@ -1345,6 +1359,9 @@
         color: color-mix(in oklab, var(--color-white) 10%, transparent);
       }
     }
+  }
+  .accent-sentinel-accent {
+    accent-color: var(--color-sentinel-accent);
   }
   .accent-white {
     accent-color: var(--color-white);
@@ -1777,10 +1794,24 @@
       }
     }
   }
+  .hover\:text-sentinel-accent {
+    &:hover {
+      @media (hover: hover) {
+        color: var(--color-sentinel-accent);
+      }
+    }
+  }
   .hover\:text-white {
     &:hover {
       @media (hover: hover) {
         color: var(--color-white);
+      }
+    }
+  }
+  .hover\:opacity-70 {
+    &:hover {
+      @media (hover: hover) {
+        opacity: 70%;
       }
     }
   }
@@ -1795,6 +1826,14 @@
   .focus\:border-sentinel-accent {
     &:focus {
       border-color: var(--color-sentinel-accent);
+    }
+  }
+  .focus\:border-sentinel-accent\/50 {
+    &:focus {
+      border-color: color-mix(in srgb, #ffd700 50%, transparent);
+      @supports (color: color-mix(in lab, red, red)) {
+        border-color: color-mix(in oklab, var(--color-sentinel-accent) 50%, transparent);
+      }
     }
   }
   .focus\:border-white\/40 {

@@ -24,6 +24,7 @@
     "@elysiajs/jwt": "^1.4.2",
     "@elysiajs/static": "^1.4.7",
     "@libsql/client": "^0.17.2",
+    "arctic": "^3.7.0",
     "elysia": "^1.4.22",
     "htmx.org": "^2.0.8",
     "leaflet": "^1.9.4",

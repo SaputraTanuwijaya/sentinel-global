@@ -1,0 +1,8 @@
+import { Google } from "arctic";
+import { env } from "./env";
+
+export const google = new Google(
+  env.GOOGLE_CLIENT_ID,
+  env.GOOGLE_CLIENT_SECRET,
+  env.OAUTH_REDIRECT_URL,
+);

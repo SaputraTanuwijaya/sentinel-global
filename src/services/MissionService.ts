@@ -16,7 +16,7 @@ export class MissionService {
     },
   };
 
-  public static async processDeployment(state: MissionState) {
+  public static async processDeployment(state: MissionState, userEmail: string) {
     const pCount = Number(state.principalCount) || 1;
     const tName = state.tierName || "Vanguard";
     const duration = Number(state.hours) || 6;
@@ -52,7 +52,7 @@ export class MissionService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         missionId,
-        "guest-operator@sentinel.local",
+        userEmail,
         pCount,
         tName,
         state.dressCode || "business_formal",

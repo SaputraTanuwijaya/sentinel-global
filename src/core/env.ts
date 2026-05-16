@@ -3,6 +3,8 @@ const required = [
   "TURSO_AUTH_TOKEN",
   "JWT_SECRET",
   "ADMIN_PASSWORD",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
 ] as const;
 
 for (const key of required) {
@@ -16,5 +18,11 @@ export const env = {
   TURSO_AUTH_TOKEN: process.env.TURSO_AUTH_TOKEN!,
   JWT_SECRET: process.env.JWT_SECRET!,
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD!,
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
+  // Defaulted for local dev; override in prod
+  OAUTH_REDIRECT_URL:
+    process.env.OAUTH_REDIRECT_URL ??
+    "http://localhost:3000/auth/google/callback",
   NODE_ENV: process.env.NODE_ENV ?? "development",
 };

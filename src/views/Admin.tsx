@@ -13,8 +13,18 @@ export const AdminDashboard = ({ missions }: { missions: any[] }) => {
               Active Mission Ledger
             </p>
           </div>
-          <div class="text-sm text-gray-500 tracking-widest">
-            Total Logs: {missions.length}
+          <div class="flex items-center gap-6">
+            <div class="text-sm text-gray-500 tracking-widest">
+              Total Logs: {missions.length}
+            </div>
+            <form method="POST" action="/auth/logout">
+              <button
+                type="submit"
+                class="text-xs tracking-widest uppercase text-gray-500 hover:text-sentinel-accent transition-colors cursor-pointer"
+              >
+                Logout
+              </button>
+            </form>
           </div>
         </header>
 
