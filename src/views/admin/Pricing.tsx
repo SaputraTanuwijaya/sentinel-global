@@ -13,11 +13,14 @@ const CATEGORY_TITLE: Record<string, string> = {
 const formatCents = (n: number) => `$${(n / 100).toFixed(2)}`;
 const formatMult = (n: number) => `×${n.toFixed(2)}`;
 
-const cellId = (key: string) => `cell-${cssEscape(key)}`;
+const cellId = (key: string) => `cell-${toDomId(key)}`;
 
-// Allowed pricing-rule keys are alphanumerics + dots; sanitise just in case.
-function cssEscape(s: string) {
-  return s.replace(/[^a-zA-Z0-9._-]/g, "_");
+// HTMX target selectors are CSS selectors, so a dot in an id becomes a class
+// selector (`#cell-base.per_principal_hour` = id=cell-base AND class=...).
+// Strip dots and anything else not safe in a DOM id. The DB key is unchanged;
+// this is only the on-page identifier.
+function toDomId(s: string) {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 const isCents = (r: PricingRule) => r.value_cents !== null;
