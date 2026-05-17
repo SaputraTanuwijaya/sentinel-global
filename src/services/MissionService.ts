@@ -1,47 +1,45 @@
 import { db } from "../core/db";
 import type { MissionState } from "../modules/order/models/Mission";
+import { PricingService } from "./PricingService";
+
+// Tracks which missing keys we've already warned about, so the log doesn't
+// fill up if an admin archives a row that's referenced every checkout.
+const warnedMissingKeys = new Set<string>();
+function warnMissingKey(key: string) {
+  if (warnedMissingKeys.has(key)) return;
+  warnedMissingKeys.add(key);
+  console.warn(`/// PRICING: no rule for "${key}" — falling back to 0 cents`);
+}
 
 export class MissionService {
-  // Set Pricing as Centralized
-  private static PRICING = {
-    PRINCIPAL: 80,
-    TIERS: { Vanguard: 0, Sentinel: 150, Praetorian: 400 },
-    MOTORCADE: {
-      PRINCIPAL: 100,
-      SWEEPER: 30,
-      LEAD: 70,
-      CAT: 150,
-      ECM: 200,
-      REAR: 70,
-    },
-  };
-
   public static async processDeployment(state: MissionState, userEmail: string) {
     const pCount = Number(state.principalCount) || 1;
     const tName = state.tierName || "Vanguard";
     const duration = Number(state.hours) || 6;
 
-    let hourlyTotal = pCount * this.PRICING.PRINCIPAL;
-    hourlyTotal +=
-      this.PRICING.TIERS[tName as keyof typeof this.PRICING.TIERS] || 0;
+    const rules = await PricingService.getAllAsMap();
+    const cents = (key: string): number => {
+      const r = rules.get(key);
+      if (!r || r.value_cents == null) {
+        warnMissingKey(key);
+        return 0;
+      }
+      return r.value_cents;
+    };
 
-    let mCost = 0;
+    let hourlyCents = pCount * cents("base.per_principal_hour");
+    hourlyCents += cents(`tier.${tName}`);
+
     if (state.motorcade) {
       Object.values(state.motorcade).forEach((v) => {
         if (v.id !== "none") {
-          mCost +=
-            (Number(v.amount) || 0) *
-            (Number(
-              this.PRICING.MOTORCADE[
-                v.role as keyof typeof this.PRICING.MOTORCADE
-              ],
-            ) || 0);
+          hourlyCents +=
+            (Number(v.amount) || 0) * cents(`vehicle_role.${v.role}`);
         }
       });
     }
-    hourlyTotal += mCost;
 
-    const totalCostCents = Math.round(hourlyTotal * duration * 100);
+    const totalCostCents = hourlyCents * duration;
     const missionId =
       "OP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 

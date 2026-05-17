@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { Html } from "@elysiajs/html";
 import { jwtPlugin, requireAdmin } from "../../core/auth";
 import { MissionService } from "../../services/MissionService";
+import { PricingService } from "../../services/PricingService";
 import { AdminLayout } from "../../views/admin/AdminLayout";
 import {
   AdminDashboard,
@@ -10,6 +11,11 @@ import {
   StatusChip,
 } from "../../views/Admin";
 import { AdminMissionDetail } from "../../views/admin/AdminMissionDetail";
+import {
+  PricingMatrix,
+  PricingCell,
+  PricingCellEditor,
+} from "../../views/admin/Pricing";
 
 export const adminRouter = new Elysia({ prefix: "/admin" })
   .use(jwtPlugin)
@@ -123,6 +129,105 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
         status: t.String(),
         from: t.Optional(t.String()),
       }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  // ─── Pricing matrix ───────────────────────────────────────────────────────
+
+  .get(
+    "/pricing",
+    async () => {
+      try {
+        const rules = await PricingService.getAll();
+        return (
+          <AdminLayout title="Pricing" active="pricing">
+            <PricingMatrix rules={rules} />
+          </AdminLayout>
+        );
+      } catch (err: any) {
+        console.error("/// ADMIN PRICING LOAD FAILED ///", err?.message ?? err);
+        return (
+          <AdminLayout title="Pricing" active="pricing">
+            <AdminError message="Could not load pricing rules." />
+          </AdminLayout>
+        );
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .get(
+    "/pricing/:key/edit",
+    async ({ params, set }) => {
+      const rule = await PricingService.get(params.key);
+      if (!rule) {
+        set.status = 404;
+        return <AdminError message={`Unknown pricing rule: ${params.key}`} />;
+      }
+      return <PricingCellEditor rule={rule} />;
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .get(
+    "/pricing/:key/cell",
+    async ({ params, set }) => {
+      const rule = await PricingService.get(params.key);
+      if (!rule) {
+        set.status = 404;
+        return <AdminError message={`Unknown pricing rule: ${params.key}`} />;
+      }
+      return <PricingCell rule={rule} />;
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .patch(
+    "/pricing/:key",
+    async ({ params, body, set }) => {
+      const rule = await PricingService.get(params.key);
+      if (!rule) {
+        set.status = 404;
+        return <AdminError message={`Unknown pricing rule: ${params.key}`} />;
+      }
+
+      const raw = String(body.value ?? "").trim();
+      if (raw === "") {
+        set.status = 400;
+        return (
+          <PricingCellEditor rule={rule} error="Enter a number." />
+        );
+      }
+      const n = Number(raw);
+      if (!Number.isFinite(n)) {
+        set.status = 400;
+        return (
+          <PricingCellEditor rule={rule} error="Enter a number." />
+        );
+      }
+
+      const patch =
+        rule.value_cents !== null
+          ? { value_cents: Math.round(n * 100) }
+          : { value_multiplier: n };
+
+      try {
+        const updated = await PricingService.update(params.key, patch);
+        return <PricingCell rule={updated} />;
+      } catch (err: any) {
+        set.status = 400;
+        return (
+          <PricingCellEditor
+            rule={rule}
+            error={err?.message ?? "Could not update."}
+          />
+        );
+      }
+    },
+    {
+      params: t.Object({ key: t.String() }),
+      body: t.Object({ value: t.String() }),
       beforeHandle: requireAdmin,
     },
   );
