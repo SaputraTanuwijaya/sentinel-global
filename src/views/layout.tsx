@@ -113,22 +113,32 @@ export const Layout = ({ children }: { children: any }) => {
                   hours: 6
                };
 
-               const PRICING = {
-                  PRINCIPAL: 80,
-                  TIERS: {
-                    'Vanguard': 0,
-                    'Sentinel': 150,
-                    'Praetorian': 400
-                  },
-                  MOTORCADE: {
-                    'PRINCIPAL': 100,
-                    'SWEEPER': 30,
-                    'LEAD': 70,
-                    'CAT': 150,
-                    'ECM': 200,
-                    'REAR': 70
-                  }
+               // Live pricing populated from /api/catalog/manifest.json.
+               // Cents-keyed, by DB key — matches server math exactly.
+               window.__PRICING__ = window.__PRICING__ || null;
+
+               // Lookups divide by 100 only at the display boundary.
+               window.__centsFor = (key) => {
+                  const p = window.__PRICING__;
+                  if (!p) return 0;
+                  return Number(p[key] || 0);
                };
+               const cents = window.__centsFor;
+               const principalRate = ()      => cents('base.per_principal_hour');
+               const tierRate     = (name)   => cents('tier.' + name);
+               const roleRate     = (role)   => cents('vehicle_role.' + role);
+               const $          = (centsAmt) => '$' + (Number(centsAmt) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+               // Boot fetch — wizard reads from the same catalog the server uses
+               // for pricing. Refreshes the ledger once values arrive.
+               fetch('/api/catalog/manifest.json', { headers: { Accept: 'application/json' } })
+                  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+                  .then(m => {
+                     window.__PRICING__ = m.pricing || {};
+                     if (window.updateLedger) window.updateLedger();
+                     if (window.updateCheckoutTotals) window.updateCheckoutTotals();
+                  })
+                  .catch(err => console.warn('Sentinel: catalog manifest unavailable', err));
 
                window.toggleLedger = () => {
                   const ledger = document.getElementById('mission-ledger');
@@ -160,32 +170,32 @@ export const Layout = ({ children }: { children: any }) => {
                   container.classList.remove('opacity-0', 'translate-x-10', 'pointer-events-none');
                   container.classList.add('opacity-100', 'translate-x-0');
 
-                  let hourlyTotal = 0;
+                  let hourlyCents = 0;
                   let html = '';
 
                   // === Detail (Principals)
-                  const principalCost = state.principalCount * PRICING.PRINCIPAL;
-                  hourlyTotal += principalCost;
+                  const principalCents = (state.principalCount || 0) * principalRate();
+                  hourlyCents += principalCents;
                   html += \`
                     <div class="flex flex-col gap-2">
                         <div class="text-white/30 text-[9px] border-b border-white/5 pb-1">=== Detail</div>
                         <div class="flex justify-between text-white">
                             <span>\${state.principalCount} Principals</span>
-                            <span>$\${principalCost}/HR</span>
+                            <span>\${$(principalCents)}/HR</span>
                         </div>
                     </div>
                   \`;
 
                   // === Tier (Only show if actually selected)
                   if (state.tierSelected) {
-                    const tierCost = PRICING.TIERS[state.tierName] || 0;
-                    hourlyTotal += tierCost;
+                    const tierCents = tierRate(state.tierName);
+                    hourlyCents += tierCents;
                     html += \`
                         <div class="flex flex-col gap-2">
                             <div class="text-white/30 text-[9px] border-b border-white/5 pb-1">=== Tier</div>
                             <div class="flex justify-between text-white">
                                 <span>\${state.tierName} Tier</span>
-                                <span>+\$\${tierCost}/HR</span>
+                                <span>+\${$(tierCents)}/HR</span>
                             </div>
                         </div>
                     \`;
@@ -193,8 +203,8 @@ export const Layout = ({ children }: { children: any }) => {
 
                   // === Motorcade
                   let motorcadeHtml = '';
-                  let motorcadeCost = 0;
-                  
+                  let motorcadeCents = 0;
+
                   // Group vehicles by role
                   const roleCounts = {};
                   if (state.motorcade) {
@@ -206,19 +216,18 @@ export const Layout = ({ children }: { children: any }) => {
                   }
 
                   Object.entries(roleCounts).forEach(([role, count]) => {
-                    const unitPrice = PRICING.MOTORCADE[role] || 0;
-                    const lineCost = count * unitPrice;
-                    motorcadeCost += lineCost;
+                    const lineCents = count * roleRate(role);
+                    motorcadeCents += lineCents;
                     motorcadeHtml += \`
                         <div class="flex justify-between text-white">
                             <span>\${count} \${role.replace('_', ' ')}</span>
-                            <span>$\${lineCost}/HR</span>
+                            <span>\${$(lineCents)}/HR</span>
                         </div>
                     \`;
                   });
 
-                  if (motorcadeCost > 0) {
-                    hourlyTotal += motorcadeCost;
+                  if (motorcadeCents > 0) {
+                    hourlyCents += motorcadeCents;
                     html += \`
                         <div class="flex flex-col gap-2">
                             <div class="text-white/30 text-[9px] border-b border-white/5 pb-1">=== Motorcade</div>
@@ -228,8 +237,8 @@ export const Layout = ({ children }: { children: any }) => {
                   }
 
                   content.innerHTML = html;
-                  hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
-                  grandEl.innerText = \`$\${(hourlyTotal * state.hours).toLocaleString()} USD\`;
+                  hourlyEl.innerText = \`\${$(hourlyCents)} USD / HR\`;
+                  grandEl.innerText = \`\${$(hourlyCents * (state.hours || 0))} USD\`;
                };
 
                document.body.addEventListener('mission-state-updated', () => {

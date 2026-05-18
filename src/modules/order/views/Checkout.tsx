@@ -352,11 +352,18 @@ export const Checkout = () => {
           (function() {
             if (!window.MissionState) window.MissionState = { hours: 6 };
 
-            const PRICING = {
-              PRINCIPAL: 80,
-              TIERS: { 'Vanguard': 0, 'Sentinel': 150, 'Praetorian': 400 },
-              MOTORCADE: { 'PRINCIPAL': 100, 'SWEEPER': 30, 'LEAD': 70, 'CAT': 150, 'ECM': 200, 'REAR': 70 }
+            // Server-driven catalog. Boot fetch happens in Layout; if a user
+            // lands here in an edge case before it resolved, trigger one.
+            const ensurePricing = () => {
+              if (window.__PRICING__) return Promise.resolve();
+              return fetch('/api/catalog/manifest.json')
+                .then(r => r.ok ? r.json() : null)
+                .then(m => { if (m) window.__PRICING__ = m.pricing || {}; })
+                .catch(() => {});
             };
+            const cents = (k) => Number((window.__PRICING__ || {})[k] || 0);
+            const fmt = (centsAmt) =>
+              '$' + (Number(centsAmt) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
             window.toggleCvc = () => {
               const cvc = document.getElementById('cvc');
@@ -382,50 +389,52 @@ export const Checkout = () => {
               const grandEl = document.getElementById('checkout-grand-total');
               if (!summaryEl || !state) return;
 
-              let hourlyTotal = 0;
+              let hourlyCents = 0;
               let html = '';
 
-              const pCost = (state.principalCount || 0) * PRICING.PRINCIPAL;
-              hourlyTotal += pCost;
+              const pCents = (state.principalCount || 0) * cents('base.per_principal_hour');
+              hourlyCents += pCents;
               html += \`
                 <div class="flex justify-between items-center">
                   <span class="text-gray-500 uppercase tracking-tighter">Principals (x\${state.principalCount || 0})</span>
-                  <span class="text-white">$\${pCost.toLocaleString()}</span>
+                  <span class="text-white">\${fmt(pCents)}</span>
                 </div>
               \`;
 
-              const tCost = PRICING.TIERS[state.tierName] || 0;
-              hourlyTotal += tCost;
+              const tCents = cents('tier.' + state.tierName);
+              hourlyCents += tCents;
               html += \`
                 <div class="flex justify-between items-center">
                   <span class="text-gray-500 uppercase tracking-tighter">Security Tier (\${state.tierName || 'None'})</span>
-                  <span class="text-white">+$\${tCost.toLocaleString()}</span>
+                  <span class="text-white">+\${fmt(tCents)}</span>
                 </div>
               \`;
 
-              let mCost = 0;
+              let mCents = 0;
               if (state.motorcade) {
                 Object.values(state.motorcade).forEach((v) => {
                   if (v.id !== 'none') {
-                    const unitPrice = PRICING.MOTORCADE[v.role] || 0;
-                    mCost += v.amount * unitPrice;
+                    mCents += v.amount * cents('vehicle_role.' + v.role);
                   }
                 });
               }
-              if (mCost > 0) {
-                hourlyTotal += mCost;
+              if (mCents > 0) {
+                hourlyCents += mCents;
                 html += \`
                   <div class="flex justify-between items-center">
                     <span class="text-gray-500 uppercase tracking-tighter">Motorcade Assets</span>
-                    <span class="text-white">+$\${mCost.toLocaleString()}</span>
+                    <span class="text-white">+\${fmt(mCents)}</span>
                   </div>
                 \`;
               }
 
               summaryEl.innerHTML = html;
-              hourlyEl.innerText = \`$\${hourlyTotal.toLocaleString()} USD / HR\`;
-              grandEl.innerText = \`$\${(hourlyTotal * (state.hours || 6)).toLocaleString()} USD\`;
+              hourlyEl.innerText = \`\${fmt(hourlyCents)} USD / HR\`;
+              grandEl.innerText = \`\${fmt(hourlyCents * (state.hours || 6))} USD\`;
             };
+
+            // Make sure pricing is available, then render.
+            ensurePricing().then(() => window.updateCheckoutTotals && window.updateCheckoutTotals());
 
             window.handleDeployment = (e) => {
               const form = e.target;
