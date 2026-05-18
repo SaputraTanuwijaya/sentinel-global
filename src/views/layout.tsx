@@ -130,12 +130,19 @@ export const Layout = ({ children }: { children: any }) => {
                const $          = (centsAmt) => '$' + (Number(centsAmt) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
                // Boot fetch — wizard reads from the same catalog the server uses
-               // for pricing. Refreshes the ledger once values arrive.
+               // for pricing. We only refresh the LEDGER if it's already on
+               // screen (i.e. the user has interacted with a wizard step);
+               // otherwise the home / landing page would spuriously show the
+               // ledger overlay just because the manifest arrived.
                fetch('/api/catalog/manifest.json', { headers: { Accept: 'application/json' } })
                   .then(r => r.ok ? r.json() : Promise.reject(r.status))
                   .then(m => {
                      window.__PRICING__ = m.pricing || {};
-                     if (window.updateLedger) window.updateLedger();
+                     const lc = document.getElementById('mission-ledger-container');
+                     const ledgerVisible = lc && lc.classList.contains('opacity-100');
+                     if (ledgerVisible && window.updateLedger) window.updateLedger();
+                     // Checkout summary is fine to always refresh — it only
+                     // exists on /step/6 anyway.
                      if (window.updateCheckoutTotals) window.updateCheckoutTotals();
                   })
                   .catch(err => console.warn('Sentinel: catalog manifest unavailable', err));

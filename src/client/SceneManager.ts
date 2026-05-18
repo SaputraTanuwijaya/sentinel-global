@@ -494,7 +494,17 @@ export class SceneManager {
     mat.map = entry.texture;
     mat.needsUpdate = true;
 
-    this.bgMesh!.position.set(0, -2, -5); // Ensure position is reset from any previous mode
+    // Dropped to y=-1 to give ~5% extra texture-top headroom in the
+    // visible region. The AI-generated source videos vary in framing —
+    // some put heads near the top frame edge — and a generous headroom
+    // here ensures subjects aren't clipped across the catalogue. At
+    // z=-3.5 the visible half-height is ~8.82; the 18-tall plane spans
+    // y=[-10, +8], so the top sits ~0.82 units below the visible top
+    // (~4.5% black band, partially covered by the header bar) and the
+    // bottom is ~1.18 below the visible bottom (cropped, covered by
+    // the info-card overlay). Lift y toward 0 for tighter framing if
+    // your source videos have built-in headroom.
+    this.bgMesh!.position.set(0, -2, -3.5);
     this.bgMesh!.visible = true;
     this.activeVideoPath = videoPath;
 
@@ -557,7 +567,8 @@ export class SceneManager {
     });
 
     this.bgMesh = new THREE.Mesh(geometry, material);
-    this.bgMesh.position.set(0, -2, -5);
+    // Keep in sync with the re-set in changeBackground().
+    this.bgMesh.position.set(0, -1, -3.5);
     this.scene.add(this.bgMesh);
   }
 

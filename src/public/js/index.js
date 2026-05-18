@@ -30945,7 +30945,7 @@ class SceneManager {
     const mat = this.bgMesh.material;
     mat.map = entry.texture;
     mat.needsUpdate = true;
-    this.bgMesh.position.set(0, -2, -5);
+    this.bgMesh.position.set(0, -2, -3.5);
     this.bgMesh.visible = true;
     this.activeVideoPath = videoPath;
     entry.video.currentTime = 0;
@@ -30983,7 +30983,7 @@ class SceneManager {
       side: DoubleSide
     });
     this.bgMesh = new Mesh(geometry, material);
-    this.bgMesh.position.set(0, -2, -5);
+    this.bgMesh.position.set(0, -1, -3.5);
     this.scene.add(this.bgMesh);
   }
   initMotorcadeMode(tier = "Vanguard") {
