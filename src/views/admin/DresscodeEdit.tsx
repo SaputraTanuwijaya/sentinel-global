@@ -190,13 +190,111 @@ export const DresscodeEdit = ({ mode, values = {}, flash }: Props) => {
               type="file"
               accept="image/jpeg,image/png,image/webp"
             />
-            {values.poster_path && (
-              <p class="text-[10px] text-gray-500 tracking-widest uppercase mt-1.5">
-                Current: {values.poster_path}
-              </p>
-            )}
+            <p
+              id="poster-hint"
+              class="text-[10px] text-gray-500 tracking-widest uppercase mt-1.5"
+            >
+              {values.poster_path ? `Current: ${values.poster_path}` : "Auto-captured from first frame of the video if blank."}
+            </p>
+            <div
+              id="poster-preview"
+              class="mt-2 hidden border border-white/10 rounded overflow-hidden bg-zinc-900"
+            >
+              <img id="poster-preview-img" alt="" class="w-full h-32 object-cover" />
+            </div>
           </div>
         </div>
+
+        {/* Auto-poster: capture first frame of selected video into the poster
+            input, unless the admin already picked a separate poster. Pure
+            client-side; no server changes. IIFE-guarded for HTMX re-runs. */}
+        <script>
+          {`
+          (function() {
+            const form = document.getElementById('dresscode-form');
+            if (!form || form.dataset.autoPosterWired) return;
+            form.dataset.autoPosterWired = '1';
+
+            const videoInput = form.querySelector('input[name="video"]');
+            const posterInput = form.querySelector('input[name="poster"]');
+            const previewBox = document.getElementById('poster-preview');
+            const previewImg = document.getElementById('poster-preview-img');
+            const hint = document.getElementById('poster-hint');
+            if (!videoInput || !posterInput) return;
+
+            let autoFilled = false; // tracks whether *we* set the poster
+
+            posterInput.addEventListener('change', () => {
+              // Manual selection wins. Stop auto-overwriting.
+              if (posterInput.files && posterInput.files.length > 0 && !autoFilled) {
+                autoFilled = false;
+                if (previewBox) previewBox.classList.add('hidden');
+              }
+              autoFilled = false;
+            });
+
+            const captureFirstFrame = (file) => new Promise((resolve, reject) => {
+              const video = document.createElement('video');
+              video.muted = true;
+              video.playsInline = true;
+              video.preload = 'metadata';
+              video.crossOrigin = 'anonymous';
+              const url = URL.createObjectURL(file);
+              video.src = url;
+              let settled = false;
+              const cleanup = () => { URL.revokeObjectURL(url); };
+              const fail = (e) => { if (settled) return; settled = true; cleanup(); reject(e); };
+              const ok = (blob) => { if (settled) return; settled = true; cleanup(); resolve(blob); };
+
+              video.addEventListener('loadeddata', () => {
+                try { video.currentTime = Math.min(0.1, (video.duration || 1) - 0.05); }
+                catch (e) { fail(e); }
+              });
+              video.addEventListener('seeked', () => {
+                try {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = video.videoWidth || 640;
+                  canvas.height = video.videoHeight || 360;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  canvas.toBlob((b) => b ? ok(b) : fail(new Error('toBlob returned null')), 'image/jpeg', 0.85);
+                } catch (e) { fail(e); }
+              });
+              video.addEventListener('error', () => fail(new Error('Video decode failed')));
+              // Hard timeout — some codecs hang the browser pipeline.
+              setTimeout(() => fail(new Error('Video frame capture timed out')), 8000);
+            });
+
+            videoInput.addEventListener('change', async () => {
+              const file = videoInput.files && videoInput.files[0];
+              if (!file) return;
+
+              // If the admin already manually picked a poster, do nothing.
+              const manuallyPicked = posterInput.files && posterInput.files.length > 0 && !autoFilled;
+              if (manuallyPicked) return;
+
+              try {
+                const blob = await captureFirstFrame(file);
+                const slug = (form.querySelector('input[name="id"]') || {}).value || 'dresscode';
+                const autoFile = new File([blob], slug + '_auto-poster.jpg', { type: 'image/jpeg' });
+                const dt = new DataTransfer();
+                dt.items.add(autoFile);
+                posterInput.files = dt.files;
+                autoFilled = true;
+
+                if (previewImg && previewBox) {
+                  previewImg.src = URL.createObjectURL(blob);
+                  previewBox.classList.remove('hidden');
+                }
+                if (hint) hint.textContent = 'Auto-captured from video. Pick a file to override.';
+              } catch (e) {
+                console.warn('Sentinel: first-frame capture failed', e);
+                if (hint) hint.textContent = "Couldn't auto-capture — pick a poster manually.";
+              }
+            });
+          })();
+          `}
+        </script>
 
         <div class="flex items-center justify-between border-t border-white/10 pt-5">
           <a
