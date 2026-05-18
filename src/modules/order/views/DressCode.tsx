@@ -1,6 +1,17 @@
 import { Html } from "@elysiajs/html";
 
-export const DressCode = () => {
+export type DresscodeOption = {
+  id: string;
+  title: string;
+  desc: string;
+};
+
+export const DressCode = ({ dresscodes }: { dresscodes: DresscodeOption[] }) => {
+  // Fail-soft: if the catalog is empty (shouldn't happen post-migration),
+  // surface a one-line placeholder rather than rendering a broken carousel.
+  const firstTitle = dresscodes[0]?.title ?? "No dress codes available";
+  const firstDesc =
+    dresscodes[0]?.desc ?? "An admin must add at least one dress code.";
   return (
     <div class="relative w-full h-full pointer-events-auto overflow-hidden animate-fade-in flex flex-col">
       {/* Layout Mask */}
@@ -139,14 +150,12 @@ export const DressCode = () => {
               id="dress-title"
               class="text-2xl font-bold uppercase tracking-widest mb-4 text-white text-center border-b border-white/10 pb-4"
             >
-              Business Formal
+              {firstTitle}
             </h3>
 
             <div class="flex-1 overflow-y-auto pr-2 mb-6 custom-scrollbar text-center">
               <p id="dress-desc" class="text-sm text-gray-300 leading-relaxed">
-                Standard corporate attire. Minimal visibility. Armor concealed
-                beneath tailored suits. Ideal for board meetings and urban
-                environments.
+                {firstDesc}
               </p>
             </div>
 
@@ -161,16 +170,15 @@ export const DressCode = () => {
         </div>
       </div>
 
+      {/* Inject the active dress-code catalog from the server. */}
+      <script>{`window.__DRESSCODES__ = ${JSON.stringify(dresscodes)};`}</script>
+
       {/* Script & Styles */}
       <script>
         {`
            (function() {
-              const options = [
-                  { id: 'business_formal', title: 'Business Formal', desc: 'Standard corporate attire. Minimal visibility. Armor concealed beneath tailored suits. Ideal for board meetings and urban environments where discretion is paramount.' },
-                  { id: 'casual_formal', title: 'Casual Formal', desc: 'Relaxed professional wear. Blazers without ties. Allows for quicker movement and concealed carry of larger sidearms. Suitable for tech conferences or semi-private events.' },
-                  { id: 'tactical_casual', title: 'Tactical Casual', desc: 'Low-profile tactical gear blended with civilian clothing. Plate carriers visible but understated. Good for high-risk public areas where a show of force is necessary but not overwhelming.' },
-                  { id: 'full_tactical', title: 'Full Tactical', desc: 'Heavy exterior armor, visible weaponry, and helmet systems. Maximum deterrence and protection. Not suitable for covert operations. Use only in high-threat zones.' }
-              ];
+              const options = window.__DRESSCODES__ || [];
+              if (options.length === 0) return;
               
               if (!window.MissionState) window.MissionState = {};
               

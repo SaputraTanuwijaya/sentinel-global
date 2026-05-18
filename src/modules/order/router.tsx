@@ -8,6 +8,7 @@ import { Rendezvous } from "./views/Rendezvous";
 import { Checkout } from "./views/Checkout";
 import { CheckoutSuccess } from "./views/CheckoutSuccess";
 import { MissionService } from "../../services/MissionService";
+import { DresscodeService } from "../../services/DresscodeService";
 import { requireUserApi, userContext } from "../../core/auth";
 import type { MissionState } from "./models/Mission";
 
@@ -17,7 +18,15 @@ export const orderRouter = new Elysia()
   .use(userContext) // adds per-request `user` from session cookie
   .get("/step/1", () => <PrincipalCount />)
   .get("/step/2", () => <GuardSelection />)
-  .get("/step/3", () => <DressCode />)
+  .get("/step/3", async () => {
+    const active = await DresscodeService.listActive();
+    const options = active.map((d) => ({
+      id: d.id,
+      title: d.label,
+      desc: d.description ?? "",
+    }));
+    return <DressCode dresscodes={options} />;
+  })
   .get("/step/4", () => <Motorcade />)
   .get("/step/5", () => <Rendezvous />)
   .get("/step/6", () => <Checkout />)
