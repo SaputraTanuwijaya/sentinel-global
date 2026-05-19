@@ -42,6 +42,21 @@ export const CheckoutSuccess = ({ missionId }: CheckoutSuccessProps) => {
       >
         Return to HQ
       </button>
+
+      {/* Mission completed server-side — drop the locally cached state so
+          the next visit starts from a clean slate. Keyed to the same
+          STATE_KEY used by layout.tsx; both must match. */}
+      <script>
+        {`
+          (function() {
+            if (window.__clearMissionState) {
+              window.__clearMissionState();
+            } else {
+              try { localStorage.removeItem('sentinel.missionState'); } catch (e) {}
+            }
+          })();
+        `}
+      </script>
     </div>
   );
 };

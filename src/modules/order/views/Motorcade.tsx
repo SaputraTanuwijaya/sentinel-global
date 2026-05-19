@@ -198,78 +198,15 @@ export const Motorcade = () => {
                 Specifications
               </button>
 
-              {/* Specs List (Hidden by default) */}
+              {/* Specs panel — rows injected by selectVehicle() from the
+                  per-vehicle `specs` map in the catalog manifest. Empty
+                  state shows "No technical specs on file." */}
               <div
                 id="specs-list"
                 class="hidden space-y-4 mb-8 border-t border-white/5 pt-4"
               >
-                <div class="grid grid-cols-2 gap-4">
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Armor Class
-                    </span>
-                    <span
-                      id="spec-armor"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Protection Grade
-                    </span>
-                    <span
-                      id="spec-protection"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Horsepower
-                    </span>
-                    <span
-                      id="spec-hp"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Torque
-                    </span>
-                    <span
-                      id="spec-torque"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Max Speed
-                    </span>
-                    <span
-                      id="spec-speed"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
-                  <div class="border-l-2 border-white/30 pl-4 py-1">
-                    <span class="block text-[10px] text-gray-500 uppercase tracking-widest">
-                      Occupancy
-                    </span>
-                    <span
-                      id="spec-occupancy"
-                      class="text-white font-bold uppercase text-sm"
-                    >
-                      --
-                    </span>
-                  </div>
+                <div id="specs-grid" class="grid grid-cols-2 gap-4">
+                  {/* rendered client-side */}
                 </div>
               </div>
             </div>
@@ -341,35 +278,56 @@ export const Motorcade = () => {
                            }
                        }, 100);
               
-                       // DATABASE: Expanded Vehicle Constraints
-                       const VEHICLE_DB = {
-                           'PRINCIPAL': [
-                               { id: 'Escalade', name: 'Cadillac Escalade', desc: 'Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.', icon: '/public/assets/images/Escalade_Icon.jpeg', specs: { armor: 'B7 (Heavy)', protection: 'Explosive Resistant', hp: '420 HP', torque: '460 LB-FT', speed: '130 MPH', occ: '2+2' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ],
-                           'LEAD': [
-                               { id: 'F150', name: 'Ford F-150', desc: 'Heavy Pursuit & Ramming Vehicle. Equipped with bull bars and high-torque engine for roadblock clearance.', icon: '/public/assets/images/F150_Icon.jpeg', specs: { armor: 'B6 (Light)', protection: 'Ballistic (Level 3)', hp: '450 HP', torque: '510 LB-FT', speed: '110 MPH', occ: '4' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ],
-                           'REAR': [
-                              { id: 'Suburban', name: 'Chevy Suburban', desc: 'Support & Medical Evacuation. Carries trauma kits and secondary communication arrays.', icon: '/public/assets/images/Suburban_Icon.jpeg', specs: { armor: 'B6', protection: 'Ballistic (Level 4)', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '6' } },
-                              { id: 'F150', name: 'Ford F-150 Support', desc: 'Tactical Support Vehicle. Cargo-optimized for logistics and gear.', icon: '/public/assets/images/F150_Icon.jpeg', specs: { armor: 'B5', protection: 'Partial Ballistic', hp: '400 HP', torque: '500 LB-FT', speed: '105 MPH', occ: '2' } },
-                              { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ],
-                           'SWEEPER': [
-                               { id: 'BMW', name: 'BMW S1000RR', desc: 'Rapid Advance Scout. Used for traffic clearing and early threat detection in dense urban environments.', icon: '/public/assets/images/S1000RR_Icon.jpeg', specs: { armor: 'None', protection: 'None', hp: '205 HP', torque: '83 LB-FT', speed: '185 MPH', occ: '1' } },
-                               { id: 'Electra', name: 'Electra Glide Tactical', desc: 'Heavy Escort Cruiser. Optimized for motorcade stability, providing a high-visibility tactical presence.', icon: '/public/assets/images/ElectraGlide_Icon.jpeg', specs: { armor: 'None', protection: 'None', hp: '105 HP', torque: '122 LB-FT', speed: '115 MPH', occ: '1' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ],
-                           'CAT': [
-                               { id: 'G63', name: 'Mercedes G63 CAT', desc: 'Counter Assault Team Unit. Integrated weapons storage and rapid egress points for tactical operators.', icon: '/public/assets/images/G63AMG_Icon.jpeg', specs: { armor: 'B6+', protection: 'High Ballistic (Level 4+)', hp: '577 HP', torque: '627 LB-FT', speed: '145 MPH', occ: '5' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ],
-                           'ECM': [
-                               { id: 'Suburban', name: 'Chevy Suburban ECM', desc: 'Electronic Countermeasures. Signal jamming suite for IED neutralization and secure comms uplink.', icon: '/public/assets/images/Suburban_Icon.jpeg', specs: { armor: 'B6', protection: 'Ballistic', hp: '355 HP', torque: '383 LB-FT', speed: '120 MPH', occ: '2' } },
-                               { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: { armor: '--', protection: '--', hp: '--', torque: '--', speed: '--', occ: '--' } }
-                           ]
+                       // Slot role -> allowed vehicle roles. Each slot
+                       // accepts vehicles whose categories array contains
+                       // its own role. Step 8 (formations + slot editor)
+                       // moves this into per-slot DB rows.
+                       const SLOT_CATEGORIES = {
+                           PRINCIPAL: ['PRINCIPAL'],
+                           LEAD:      ['LEAD'],
+                           REAR:      ['REAR'],
+                           SWEEPER:   ['SWEEPER'],
+                           CAT:       ['CAT'],
+                           ECM:       ['ECM'],
                        };
+
+                       // Specs come from the catalog manifest per-vehicle.
+                       // Migration seeds v1 vehicles; admin-defined keys
+                       // flow through with no code change. Pretty labels
+                       // for known keys live in SPEC_LABELS; unknown keys
+                       // are titlecased on render.
+                       const SPEC_LABELS = {
+                           armor:      'Armor Class',
+                           protection: 'Protection Grade',
+                           hp:         'Horsepower',
+                           torque:     'Torque',
+                           speed:      'Max Speed',
+                           occupancy:  'Occupancy',
+                       };
+                       const labelFor = (k) =>
+                           SPEC_LABELS[k] || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                       const NONE_OPTION = { id: 'none', name: 'None', desc: 'No vehicle assigned to this slot.', icon: null, specs: {} };
+
+                       // Build the role -> [vehicles] map from the catalog
+                       // manifest. Called fresh on every garage open so
+                       // edits to /admin/vehicles surface on the next pick.
+                       function buildVehiclesForRole(role) {
+                           const catalog = window.__VEHICLES__ || {};
+                           const allowedRoles = SLOT_CATEGORIES[role] || [];
+                           const matches = Object.values(catalog)
+                              .filter(v => {
+                                  const cats = Array.isArray(v.categories) ? v.categories : [v.category];
+                                  return cats.some(c => allowedRoles.includes(c));
+                              })
+                              .map(v => ({
+                                  id: v.id,
+                                  name: v.label,
+                                  desc: v.description || '',
+                                  icon: v.thumbnail_path || null,
+                                  specs: (v.specs && typeof v.specs === 'object') ? v.specs : {},
+                              }));
+                           return matches.concat([NONE_OPTION]);
+                       }
               
                        // EVENT LISTENER — Remove previous handler to prevent duplicates on HTMX re-entry
                        if (window._garageOpenHandler) {
@@ -389,7 +347,7 @@ export const Motorcade = () => {
                            const container = document.getElementById('vehicle-options-view');
                            container.innerHTML = ''; // Clear
               
-                           const options = VEHICLE_DB[role] || [];
+                           const options = buildVehiclesForRole(role);
                            
                            options.forEach(car => {
                                const card = document.createElement('div');
@@ -459,13 +417,21 @@ export const Motorcade = () => {
                            }
                            updateAmountUI();
               
-                           // Update Specs (Internal)
-                           document.getElementById('spec-armor').innerText = car.specs.armor;
-                           document.getElementById('spec-protection').innerText = car.specs.protection;
-                           document.getElementById('spec-hp').innerText = car.specs.hp;
-                           document.getElementById('spec-torque').innerText = car.specs.torque;
-                           document.getElementById('spec-speed').innerText = car.specs.speed;
-                           document.getElementById('spec-occupancy').innerText = car.specs.occ;
+                           // Render specs from the manifest. Whatever keys
+                           // the admin set show up here; no schema in this
+                           // file means new fields are free.
+                           const grid = document.getElementById('specs-grid');
+                           const specEntries = Object.entries(car.specs || {});
+                           if (specEntries.length === 0) {
+                               grid.innerHTML = \`<div class="col-span-2 text-gray-500 text-xs italic py-2">No technical specs on file.</div>\`;
+                           } else {
+                               grid.innerHTML = specEntries.map(([k, v]) => \`
+                                   <div class="border-l-2 border-white/30 pl-4 py-1">
+                                       <span class="block text-[10px] text-gray-500 uppercase tracking-widest">\${labelFor(k)}</span>
+                                       <span class="text-white font-bold uppercase text-sm">\${v || '—'}</span>
+                                   </div>
+                               \`).join('');
+                           }
               
                            // Reset Specs visibility
                            document.getElementById('specs-list').classList.add('hidden');

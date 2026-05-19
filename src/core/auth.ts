@@ -38,12 +38,35 @@ export const requireUser = ({ user }: any) => {
   if (!user) return redirect("/auth/login");
 };
 
-// API guard: returns 401 JSON instead of redirecting (better for HTMX/fetch).
-export const requireUserApi = ({ user, set }: any) => {
-  if (!user) {
-    set.status = 401;
-    return { error: "Authentication required." };
+// API guard for protected endpoints called from the wizard.
+//
+// - HTMX requests: respond with HX-Redirect so HTMX issues a full-window
+//   navigation to /auth/login. We thread a `next` query param so login can
+//   bounce the user back to the step they were on. Mission state survives
+//   the round-trip via localStorage (see layout.tsx).
+// - Plain fetch: return a 401 JSON body — for any non-HTMX caller, the
+//   browser can decide what to do.
+export const requireUserApi = ({ user, set, request }: any) => {
+  if (user) return;
+  const isHtmx = request?.headers?.get?.("HX-Request") === "true";
+  if (isHtmx) {
+    const referer = request.headers.get("Referer") || "";
+    // Pull the path from Referer (origin-stripped) so we can resume on the
+    // exact wizard step. Falls back to /step/6 (Checkout) because that's
+    // the only protected entry point today.
+    let next = "/step/6";
+    try {
+      const url = new URL(referer);
+      if (url.pathname.startsWith("/step/")) next = url.pathname;
+    } catch {
+      /* no referer / malformed — keep default */
+    }
+    set.headers["HX-Redirect"] =
+      `/auth/login?next=${encodeURIComponent(next)}`;
+    return "";
   }
+  set.status = 401;
+  return { error: "Authentication required." };
 };
 
 export type { User };

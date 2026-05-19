@@ -44,9 +44,11 @@ const COUNTRIES = [
 export const RegisterPage = ({
   error,
   values,
+  next,
 }: {
   error?: string;
   values?: RegisterValues;
+  next?: string;
 } = {}) => (
   <AuthLayout title="Register">
     <div class="auth-header">
@@ -59,6 +61,7 @@ export const RegisterPage = ({
     </div>
 
     <form method="POST" action="/auth/register">
+      {next && <input type="hidden" name="next" value={next} />}
       <div class="form-field">
         <label class="form-label">Full Name</label>
         <input
@@ -126,11 +129,13 @@ export const RegisterPage = ({
       <div class="auth-divider-line"></div>
     </div>
 
-    <GoogleButton label="Sign up with Google" />
+    <GoogleButton label="Sign up with Google" next={next} />
 
     <p class="auth-switch">
       Have an account?{" "}
-      <a href="/auth/login">Sign In</a>
+      <a href={next ? `/auth/login?next=${encodeURIComponent(next)}` : "/auth/login"}>
+        Sign In
+      </a>
     </p>
   </AuthLayout>
 );

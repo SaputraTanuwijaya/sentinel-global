@@ -31,7 +31,8 @@ const TABLES: { name: string; sql: string }[] = [
       CREATE TABLE IF NOT EXISTS vehicles (
         id              TEXT PRIMARY KEY,
         label           TEXT NOT NULL,
-        category        TEXT NOT NULL,
+        category        TEXT NOT NULL,             -- legacy single value, kept for back-compat; service reads from \`categories\`
+        categories      TEXT NOT NULL DEFAULT '[]', -- JSON array of slot-role strings (PRINCIPAL, LEAD, REAR, SWEEPER, CAT, ECM)
         description     TEXT,
         model_path      TEXT NOT NULL,
         thumbnail_path  TEXT,
@@ -171,20 +172,90 @@ const DRESSCODES: Dresscode[] = [
 type Vehicle = {
   id: string;
   label: string;
-  category: string; // {LEAD, ECM, JAMMER, TAIL, SEDAN, SUV}
+  // Primary category (for the legacy `category` column). Use the first
+  // entry of `categories` so old code that reads the column gets a sane
+  // value. The service reads from the JSON `categories` array.
+  category: string;
+  categories: string[]; // role-based enum: PRINCIPAL, LEAD, REAR, SWEEPER, CAT, ECM
   description: string;
   model_path: string;
   thumbnail_path: string;
 };
 
-// NOTE: category enum is hardcoded v1 per docs/admin.md. SUVs/trucks → SUV;
-// motorcycles → TAIL (closest match in the enum). The admin can correct in
-// Step 6 once Vehicles CRUD is wired.
+// Per-vehicle Y-axis rotation correction (degrees). Some GLBs are authored
+// facing the wrong direction relative to the +Z forward convention; this
+// value is added once when the `model_rotation_y_deg` column is introduced.
+// Admin edits afterwards take precedence — the migration only writes on the
+// first run that adds the column.
+const SEED_ROTATIONS: Record<string, number> = {
+  F150: 180,
+  Electra: 180,
+};
+
+// Per-vehicle technical specs. Replaces the in-file KNOWN_SPECS const that
+// used to live in Motorcade.tsx — now the wizard reads specs straight from
+// the catalog manifest. New keys can be added per-vehicle in admin without
+// touching client code; the spec panel renders whatever it receives.
+const SEED_SPECS: Record<string, Record<string, string>> = {
+  Escalade: {
+    armor: "B7 (Heavy)",
+    protection: "Explosive Resistant",
+    hp: "420 HP",
+    torque: "460 LB-FT",
+    speed: "130 MPH",
+    occupancy: "2+2",
+  },
+  G63: {
+    armor: "B6+",
+    protection: "High Ballistic (Level 4+)",
+    hp: "577 HP",
+    torque: "627 LB-FT",
+    speed: "145 MPH",
+    occupancy: "5",
+  },
+  Suburban: {
+    armor: "B6",
+    protection: "Ballistic (Level 4)",
+    hp: "355 HP",
+    torque: "383 LB-FT",
+    speed: "120 MPH",
+    occupancy: "6",
+  },
+  F150: {
+    armor: "B6 (Light)",
+    protection: "Ballistic (Level 3)",
+    hp: "450 HP",
+    torque: "510 LB-FT",
+    speed: "110 MPH",
+    occupancy: "4",
+  },
+  BMW: {
+    armor: "None",
+    protection: "None",
+    hp: "205 HP",
+    torque: "83 LB-FT",
+    speed: "185 MPH",
+    occupancy: "1",
+  },
+  Electra: {
+    armor: "None",
+    protection: "None",
+    hp: "105 HP",
+    torque: "122 LB-FT",
+    speed: "115 MPH",
+    occupancy: "1",
+  },
+};
+
+// Vehicles are categorized by their convoy role (matching the slot roles in
+// Motorcade.tsx), not by chassis. Multi-role assignments mirror the original
+// hardcoded VEHICLE_DB in the wizard.
 const VEHICLES: Vehicle[] = [
   {
     id: "Escalade",
     label: "Cadillac Escalade",
-    category: "SUV",
+    category: "PRINCIPAL",
+    categories: ["PRINCIPAL"],
     description:
       "Class-7 Armored Transport. Features run-flat tires, reinforced chassis, and explosive protection.",
     model_path: "/public/assets/models/CadillacEscalade_Optimized-v1.glb",
@@ -193,7 +264,8 @@ const VEHICLES: Vehicle[] = [
   {
     id: "G63",
     label: "Mercedes G63 AMG",
-    category: "SUV",
+    category: "CAT",
+    categories: ["CAT"],
     description:
       "Counter Assault Team unit. Integrated weapons storage and rapid egress points for tactical operators.",
     model_path: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
@@ -202,7 +274,8 @@ const VEHICLES: Vehicle[] = [
   {
     id: "Suburban",
     label: "Chevy Suburban",
-    category: "SUV",
+    category: "REAR",
+    categories: ["REAR", "ECM"],
     description:
       "Support and ECM platform. Carries trauma kits, signal-jamming suite, and secure comms uplink.",
     model_path: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
@@ -211,7 +284,8 @@ const VEHICLES: Vehicle[] = [
   {
     id: "F150",
     label: "Ford F-150",
-    category: "SUV",
+    category: "LEAD",
+    categories: ["LEAD", "REAR"],
     description:
       "Heavy pursuit and ramming vehicle. Bull bars and high-torque engine for roadblock clearance.",
     model_path: "/public/assets/models/FordF150_Optimized-v3.glb",
@@ -220,7 +294,8 @@ const VEHICLES: Vehicle[] = [
   {
     id: "BMW",
     label: "BMW S1000RR",
-    category: "TAIL",
+    category: "SWEEPER",
+    categories: ["SWEEPER"],
     description:
       "Rapid advance scout. Used for traffic clearing and early threat detection in dense urban environments.",
     model_path: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb",
@@ -229,7 +304,8 @@ const VEHICLES: Vehicle[] = [
   {
     id: "Electra",
     label: "Electra Glide Tactical",
-    category: "TAIL",
+    category: "SWEEPER",
+    categories: ["SWEEPER"],
     description:
       "Heavy escort cruiser. Optimized for motorcade stability with high-visibility tactical presence.",
     model_path: "/public/assets/models/Electra_Optimized-v1.glb",
@@ -348,6 +424,85 @@ async function run() {
   }
   console.log(`   ✓ ${INDEXES.length} indexes`);
 
+  // ── Idempotent upgrade: pre-multi-category installs ─────────────────────
+  // Older installs had vehicles.category (single TEXT) and no `categories`
+  // column. Add the column if missing and backfill from the original
+  // hardcoded VEHICLE_DB so seeded vehicles inherit their true multi-role
+  // assignments. Any non-seeded vehicle gets [category] as a single-item
+  // array (best guess from its legacy value).
+  console.log("→ upgrading vehicles.categories (if needed)");
+  const cols = await db.execute("PRAGMA table_info(vehicles)");
+  const hasCategories = cols.rows.some(
+    (r: any) => (r.name ?? r[1]) === "categories",
+  );
+  if (!hasCategories) {
+    await db.execute(
+      "ALTER TABLE vehicles ADD COLUMN categories TEXT NOT NULL DEFAULT '[]'",
+    );
+    // Best-effort backfill from legacy single-value `category`. Replaced
+    // below for known seeded vehicles.
+    await db.execute(
+      "UPDATE vehicles SET categories = json_array(category) WHERE categories = '[]'",
+    );
+    console.log("   ✓ added categories column + backfilled from category");
+  } else {
+    console.log("   ✓ categories column already present");
+  }
+  // Always re-apply the canonical multi-role mapping for the seeded
+  // vehicles, so previous incorrect assignments (SUV/TAIL) are corrected.
+  for (const v of VEHICLES) {
+    await db.execute({
+      sql: "UPDATE vehicles SET category = ?, categories = ? WHERE id = ?",
+      args: [v.category, JSON.stringify(v.categories), v.id],
+    });
+  }
+  console.log("   ✓ canonical role-based categories applied to seeded vehicles");
+
+  // ── Idempotent upgrade: vehicles.model_rotation_y_deg ───────────────────
+  // Replaces the F150/Electra hardcoded `vehicle.rotation.y = Math.PI`
+  // branch in SceneManager.loadVehicleAt. First-run only: backfill the two
+  // known-backward GLBs. Subsequent runs respect whatever the admin set.
+  console.log("→ upgrading vehicles.model_rotation_y_deg (if needed)");
+  const hasRotation = cols.rows.some(
+    (r: any) => (r.name ?? r[1]) === "model_rotation_y_deg",
+  );
+  if (!hasRotation) {
+    await db.execute(
+      "ALTER TABLE vehicles ADD COLUMN model_rotation_y_deg REAL NOT NULL DEFAULT 0",
+    );
+    for (const [id, deg] of Object.entries(SEED_ROTATIONS)) {
+      await db.execute({
+        sql: "UPDATE vehicles SET model_rotation_y_deg = ? WHERE id = ?",
+        args: [deg, id],
+      });
+    }
+    console.log("   ✓ added model_rotation_y_deg + backfilled F150/Electra");
+  } else {
+    console.log("   ✓ model_rotation_y_deg already present");
+  }
+
+  // ── Idempotent upgrade: vehicles.specs_json ─────────────────────────────
+  // Replaces the in-file KNOWN_SPECS in Motorcade.tsx. First-run only:
+  // seed canonical specs for the v1 vehicles. Admin edits afterwards are
+  // not clobbered (only re-runs that re-add the column would touch them,
+  // and re-adding is gated by the column-exists check).
+  console.log("→ upgrading vehicles.specs_json (if needed)");
+  const hasSpecs = cols.rows.some(
+    (r: any) => (r.name ?? r[1]) === "specs_json",
+  );
+  if (!hasSpecs) {
+    await db.execute("ALTER TABLE vehicles ADD COLUMN specs_json TEXT");
+    for (const [id, specs] of Object.entries(SEED_SPECS)) {
+      await db.execute({
+        sql: "UPDATE vehicles SET specs_json = ? WHERE id = ?",
+        args: [JSON.stringify(specs), id],
+      });
+    }
+    console.log("   ✓ added specs_json + seeded v1 vehicle specs");
+  } else {
+    console.log("   ✓ specs_json already present");
+  }
+
   console.log("→ seeding dresscodes");
   for (const d of DRESSCODES) {
     await db.execute({
@@ -371,13 +526,14 @@ async function run() {
   for (const v of VEHICLES) {
     await db.execute({
       sql: `INSERT OR IGNORE INTO vehicles
-            (id, label, category, description, model_path, thumbnail_path,
+            (id, label, category, categories, description, model_path, thumbnail_path,
              scale, price_cents, status)
-            VALUES (?, ?, ?, ?, ?, ?, 1.0, 0, 'active')`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1.0, 0, 'active')`,
       args: [
         v.id,
         v.label,
         v.category,
+        JSON.stringify(v.categories),
         v.description,
         v.model_path,
         v.thumbnail_path,

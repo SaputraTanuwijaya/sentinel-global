@@ -27,6 +27,29 @@ const stateCookieFlags = { ...baseCookieFlags, maxAge: STATE_MAX_AGE };
 // HTML checkboxes submit "on" when checked, nothing when unchecked.
 const isChecked = (v: unknown) => v === "on" || v === "true" || v === true;
 
+// Open-redirect guard. Accept ONLY same-origin relative paths so a crafted
+// `?next=https://evil.example/...` can't be used to bounce victims off-site
+// after we set their session cookie. Anything else collapses to the default.
+function safeNext(raw: unknown, fallback = "/"): string {
+  if (typeof raw !== "string") return fallback;
+  // Must start with a single "/", not "//" (protocol-relative) or "/\\".
+  if (!raw.startsWith("/") || raw.startsWith("//") || raw.startsWith("/\\")) {
+    return fallback;
+  }
+  return raw;
+}
+
+// Build the "land here" URL after auth. We always send users to `/` (so the
+// full Layout + 3D shell loads) and let the boot script swap into the
+// requested wizard step via HTMX. Direct GET on `/step/*` would skip the
+// Layout entirely and yield a broken page.
+function postAuthLanding(next: string): string {
+  if (next.startsWith("/step/")) {
+    return `/?resume=${encodeURIComponent(next)}`;
+  }
+  return next;
+}
+
 // Constant-time admin password compare (timing-attack safe).
 function adminPasswordMatches(input: string): boolean {
   const a = Buffer.from(input);
@@ -47,19 +70,19 @@ export const authRouter = new Elysia({ prefix: "/auth" })
   // by the body-only swap, leaving auth styles missing until refresh. Returning
   // HX-Refresh: true tells HTMX to do a full window.location reload, which then
   // loads AuthLayout cleanly with its <head> intact.
-  .get("/login", ({ request, set }) => {
+  .get("/login", ({ request, set, query }) => {
     if (request.headers.get("HX-Request") === "true") {
       set.headers["HX-Refresh"] = "true";
       return "";
     }
-    return <UserLoginPage />;
+    return <UserLoginPage next={safeNext(query.next, "")} />;
   })
-  .get("/register", ({ request, set }) => {
+  .get("/register", ({ request, set, query }) => {
     if (request.headers.get("HX-Request") === "true") {
       set.headers["HX-Refresh"] = "true";
       return "";
     }
-    return <RegisterPage />;
+    return <RegisterPage next={safeNext(query.next, "")} />;
   })
 
   .post(
@@ -70,6 +93,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
       const name = body.name?.trim() || undefined;
       const phone = body.phone?.trim() || undefined;
       const country = body.country?.trim() || undefined;
+      const next = safeNext(body.next, "/");
 
       if (email === "admin") {
         set.status = 400;
@@ -77,6 +101,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
           <RegisterPage
             error="That email is reserved."
             values={{ email: "", name, phone, country }}
+            next={next === "/" ? undefined : next}
           />
         );
       }
@@ -87,6 +112,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
           <RegisterPage
             error="Password must be at least 8 characters."
             values={{ email, name, phone, country }}
+            next={next === "/" ? undefined : next}
           />
         );
       }
@@ -97,13 +123,14 @@ export const authRouter = new Elysia({ prefix: "/auth" })
         const ttl = remember ? SESSION_REMEMBER_TTL : SESSION_DEFAULT_TTL;
         const session = await UserService.createSession(user.id, ttl);
         cookie.session.set({ value: session.id, ...baseCookieFlags, maxAge: ttl });
-        return redirect("/");
+        return redirect(postAuthLanding(next));
       } catch (err: any) {
         set.status = 400;
         return (
           <RegisterPage
             error={err.message ?? "Registration failed."}
             values={{ email, name, phone, country }}
+            next={next === "/" ? undefined : next}
           />
         );
       }
@@ -116,6 +143,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
         phone: t.Optional(t.String()),
         country: t.Optional(t.String()),
         remember: t.Optional(t.String()),
+        next: t.Optional(t.String()),
       }),
     },
   )
@@ -125,13 +153,18 @@ export const authRouter = new Elysia({ prefix: "/auth" })
     async ({ body, jwt, cookie, set }) => {
       const email = body.email.trim().toLowerCase();
       const remember = isChecked(body.remember);
+      const next = safeNext(body.next, "/");
 
       // Same generic error for admin and user paths to avoid revealing whether
       // a given email exists — the only public signal is "good or bad".
       const fail = () => {
         set.status = 401;
         return (
-          <UserLoginPage error="Invalid email or password." values={{ email }} />
+          <UserLoginPage
+            error="Invalid email or password."
+            values={{ email }}
+            next={next === "/" ? undefined : next}
+          />
         );
       };
 
@@ -153,13 +186,14 @@ export const authRouter = new Elysia({ prefix: "/auth" })
       const ttl = remember ? SESSION_REMEMBER_TTL : SESSION_DEFAULT_TTL;
       const session = await UserService.createSession(user.id, ttl);
       cookie.session.set({ value: session.id, ...baseCookieFlags, maxAge: ttl });
-      return redirect("/");
+      return redirect(postAuthLanding(next));
     },
     {
       body: t.Object({
         email: t.String(),
         password: t.String(),
         remember: t.Optional(t.String()),
+        next: t.Optional(t.String()),
       }),
     },
   )
@@ -174,7 +208,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
   })
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
-  .get("/google", ({ cookie }) => {
+  .get("/google", ({ cookie, query }) => {
     const state = generateState();
     const codeVerifier = generateCodeVerifier();
     const url = google.createAuthorizationURL(state, codeVerifier, [
@@ -185,6 +219,12 @@ export const authRouter = new Elysia({ prefix: "/auth" })
 
     cookie.oauth_state.set({ value: state, ...stateCookieFlags });
     cookie.oauth_verifier.set({ value: codeVerifier, ...stateCookieFlags });
+    // Stash the post-auth landing URL alongside the PKCE state so the
+    // callback can resume the wizard step the user came from.
+    const next = safeNext(query.next, "/");
+    if (next !== "/") {
+      cookie.oauth_next.set({ value: next, ...stateCookieFlags });
+    }
 
     return redirect(url.toString());
   })
@@ -202,6 +242,8 @@ export const authRouter = new Elysia({ prefix: "/auth" })
 
     cookie.oauth_state.remove();
     cookie.oauth_verifier.remove();
+    const next = safeNext(cookie.oauth_next?.value, "/");
+    cookie.oauth_next?.remove();
 
     try {
       const tokens = await google.validateAuthorizationCode(code, codeVerifier);
@@ -238,7 +280,7 @@ export const authRouter = new Elysia({ prefix: "/auth" })
         ...baseCookieFlags,
         maxAge: SESSION_REMEMBER_TTL,
       });
-      return redirect("/");
+      return redirect(postAuthLanding(next));
     } catch (err: any) {
       console.error(
         "/// GOOGLE OAUTH FAILED ///",

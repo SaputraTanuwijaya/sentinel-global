@@ -882,18 +882,34 @@ export class SceneManager {
 
     if (vehicleType === "none") return;
 
-    // Map vehicleType to GLB Path
-    const modelMap: Record<string, string> = {
-      Escalade: "/public/assets/models/CadillacEscalade_Optimized-v1.glb",
-      G63: "/public/assets/models/MercedesAMGG63_Optimized-v1.glb",
-      Suburban: "/public/assets/models/ChevroletSuburban_Optimized-v1.glb",
-      F150: "/public/assets/models/FordF150_Optimized-v3.glb",
-      BMW: "/public/assets/models/BMW-S1000RR_Optimized-v1.glb",
-      Electra: "/public/assets/models/Electra_Optimized-v1.glb",
-    };
-
-    const path = modelMap[vehicleType];
-    if (!path) return;
+    // Look up the vehicle in the catalog manifest. Layout.tsx populates
+    // window.__VEHICLES__ on boot from /api/catalog/manifest.json. If the
+    // manifest hasn't loaded yet, or the id is unknown (e.g. archived),
+    // we bail with a warning rather than crash the scene.
+    const catalog =
+      (window as any).__VEHICLES__ as
+        | Record<
+            string,
+            {
+              id: string;
+              model_path: string;
+              scale?: number;
+            }
+          >
+        | undefined;
+    const entry = catalog?.[vehicleType];
+    if (!entry || !entry.model_path) {
+      console.warn(
+        `Sentinel: no manifest entry for vehicle "${vehicleType}" — skipping load.`,
+      );
+      return;
+    }
+    const path = entry.model_path;
+    const vehicleScale = Number(entry.scale) || 1.0;
+    // Per-vehicle Y-axis correction (degrees). Stored on the row so a new
+    // admin upload can fix its facing direction without touching code.
+    const rotationY =
+      (Number(entry.model_rotation_y_deg) || 0) * (Math.PI / 180);
 
     const group = new THREE.Group();
     group.position.copy(slot.position);
@@ -921,13 +937,12 @@ export class SceneManager {
         .then((vehicle) => {
           vehicle.position.copy(offset);
 
-          if (vehicleType === "F150" || vehicleType === "Electra") {
-            vehicle.rotation.y = Math.PI;
-          } else {
-            vehicle.rotation.y = 0;
-          }
+          // Y-axis correction comes straight from the manifest now; the
+          // F150/Electra special-case is gone. New admin uploads can pick
+          // 0/90/180/270 (or anything) without a code change.
+          vehicle.rotation.y = rotationY;
 
-          vehicle.scale.set(1, 1, 1);
+          vehicle.scale.setScalar(vehicleScale);
 
           // Animate In (Drop)
           const initialY = 5;

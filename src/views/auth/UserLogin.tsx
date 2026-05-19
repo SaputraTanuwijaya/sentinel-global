@@ -5,9 +5,12 @@ import { GoogleButton } from "./GoogleButton";
 export const UserLoginPage = ({
   error,
   values,
+  next,
 }: {
   error?: string;
   values?: { email?: string };
+  /** Path to bounce to after successful login. Server validates safety. */
+  next?: string;
 } = {}) => (
   <AuthLayout title="Sign In">
     <div class="auth-header">
@@ -16,10 +19,13 @@ export const UserLoginPage = ({
         <span>Operator Access</span>
       </div>
       <h1 class="auth-title">Sign In</h1>
-      <p class="auth-subtitle">Authentication Required</p>
+      <p class="auth-subtitle">
+        {next ? "Sign in to complete deployment" : "Authentication Required"}
+      </p>
     </div>
 
     <form method="POST" action="/auth/login">
+      {next && <input type="hidden" name="next" value={next} />}
       <div class="form-field">
         <label class="form-label">Email Address</label>
         <input
@@ -53,11 +59,13 @@ export const UserLoginPage = ({
       <div class="auth-divider-line"></div>
     </div>
 
-    <GoogleButton />
+    <GoogleButton next={next} />
 
     <p class="auth-switch">
       No account?{" "}
-      <a href="/auth/register">Register</a>
+      <a href={next ? `/auth/register?next=${encodeURIComponent(next)}` : "/auth/register"}>
+        Register
+      </a>
     </p>
   </AuthLayout>
 );

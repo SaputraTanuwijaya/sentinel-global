@@ -18,6 +18,9 @@ export const Layout = ({ children }: { children: any }) => {
             body { margin: 0; overflow: hidden; background-color: #0a0a0a; color: white; }
             #canvas-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
             #ui-layer { position: relative; z-index: 10; pointer-events: none; height: 100vh; width: 100vw; }
+            /* Hide the floating financial ledger on /step/6 — Checkout has its
+               own Mission Summary panel; two pricing widgets is redundant. */
+            body.wizard-checkout #mission-ledger-container { display: none; }
           `}
         </style>
       </head>
@@ -106,11 +109,52 @@ export const Layout = ({ children }: { children: any }) => {
         <script>
           {`
            (function() {
-               window.MissionState = {
+               // ── HTMX response handling ───────────────────────────────────
+               // Default htmx v2 skips swapping on 4xx, so server-rendered
+               // error forms (e.g. /admin/vehicles returning 400 with the
+               // form + flash banner) never reach the DOM and the user only
+               // sees "Response Status Error Code 400" in the console.
+               // Flip 4xx to swap-with-error so validation errors render
+               // in place. 5xx still propagates an error event.
+               if (window.htmx && window.htmx.config) {
+                  window.htmx.config.responseHandling = [
+                     { code: '204', swap: false },
+                     { code: '[23]..', swap: true },
+                     { code: '[45]..', swap: true, error: true },
+                     { code: '...', swap: false, error: true },
+                  ];
+               }
+
+               // ── MissionState persistence ─────────────────────────────────
+               // Survives auth round-trips: if a guest tries to checkout, we
+               // bounce them to /auth/login and back via ?resume=/step/X.
+               // Without persistence they'd lose every selection they made.
+               // Cleared explicitly in CheckoutSuccess once the mission is
+               // saved server-side. Storage key is namespaced so it's easy
+               // to identify in DevTools.
+               const STATE_KEY = 'sentinel.missionState';
+               const DEFAULT_STATE = {
                   principalCount: 1,
                   tierName: 'Vanguard',
                   motorcade: {},
                   hours: 6
+               };
+               const loadSavedState = () => {
+                  try {
+                      const raw = localStorage.getItem(STATE_KEY);
+                      if (!raw) return null;
+                      const parsed = JSON.parse(raw);
+                      return (parsed && typeof parsed === 'object') ? parsed : null;
+                  } catch (e) { return null; }
+               };
+               window.MissionState = Object.assign({}, DEFAULT_STATE, loadSavedState() || {});
+               window.__saveMissionState = () => {
+                  try { localStorage.setItem(STATE_KEY, JSON.stringify(window.MissionState)); }
+                  catch (e) {}
+               };
+               window.__clearMissionState = () => {
+                  try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+                  window.MissionState = Object.assign({}, DEFAULT_STATE);
                };
 
                // Live pricing populated from /api/catalog/manifest.json.
@@ -138,11 +182,14 @@ export const Layout = ({ children }: { children: any }) => {
                   .then(r => r.ok ? r.json() : Promise.reject(r.status))
                   .then(m => {
                      window.__PRICING__ = m.pricing || {};
+                     // Vehicles indexed by id for O(1) lookup by SceneManager
+                     // (model_path) and Motorcade.tsx (label, thumbnail).
+                     window.__VEHICLES__ = {};
+                     for (const v of (m.vehicles || [])) window.__VEHICLES__[v.id] = v;
+                     document.body.dispatchEvent(new CustomEvent('sentinel-catalog-ready'));
                      const lc = document.getElementById('mission-ledger-container');
                      const ledgerVisible = lc && lc.classList.contains('opacity-100');
                      if (ledgerVisible && window.updateLedger) window.updateLedger();
-                     // Checkout summary is fine to always refresh — it only
-                     // exists on /step/6 anyway.
                      if (window.updateCheckoutTotals) window.updateCheckoutTotals();
                   })
                   .catch(err => console.warn('Sentinel: catalog manifest unavailable', err));
@@ -249,8 +296,53 @@ export const Layout = ({ children }: { children: any }) => {
                };
 
                document.body.addEventListener('mission-state-updated', () => {
+                  window.__saveMissionState();
                   window.updateLedger();
                });
+
+               // Safety net: not every step fires the mission-state-updated
+               // event after every mutation (Rendezvous sets location/time
+               // without dispatching). pagehide fires on full-window nav AND
+               // on the HX-Redirect to window.location.href path the auth
+               // round-trip uses, so whatever the user typed makes it to
+               // localStorage before we lose the tab context.
+               window.addEventListener('pagehide', window.__saveMissionState);
+
+               // ── ?resume= hand-off after login ───────────────────────────
+               // The auth router redirects to "/?resume=/step/X" after a
+               // successful login so the Layout (and its 3D shell + boot
+               // fetches) loads cleanly, then we swap back into the wizard
+               // step the user was on. Strips the param after handling so a
+               // refresh doesn't re-trigger.
+               const resumeStep = () => {
+                  const params = new URLSearchParams(window.location.search);
+                  const resume = params.get('resume');
+                  if (!resume || !resume.startsWith('/step/')) return;
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('resume');
+                  window.history.replaceState({}, '', url.toString());
+                  // htmx is loaded synchronously in <head>, so it's defined
+                  // by the time this IIFE runs. Use htmx.ajax so the swap
+                  // honors the existing #ui-layer target convention.
+                  if (window.htmx && typeof window.htmx.ajax === 'function') {
+                     window.htmx.ajax('GET', resume, { target: '#ui-layer', swap: 'innerHTML' });
+                  } else {
+                     // Fallback: native nav. Step routes don't include the
+                     // Layout, so this is only a safety net.
+                     window.location.href = resume;
+                  }
+               };
+               resumeStep();
+
+               // Toggle the .wizard-checkout body class so CSS can hide the
+               // floating ledger on /step/6. Re-evaluated on every HTMX
+               // swap so back/forward navigation restores it correctly.
+               const syncCheckoutMode = () => {
+                  const onCheckout = !!document.getElementById('checkout-form');
+                  document.body.classList.toggle('wizard-checkout', onCheckout);
+               };
+               syncCheckoutMode();
+               document.body.addEventListener('htmx:afterSwap', syncCheckoutMode);
            })();
         `}
         </script>

@@ -12,6 +12,8 @@ export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
 
 const PUBLIC_DIR = "src/public";
 
+type AcceptKind = "video" | "image" | "model";
+
 const VIDEO_EXT: Record<string, string> = {
   "video/mp4": ".mp4",
   "video/webm": ".webm",
@@ -24,7 +26,32 @@ const IMAGE_EXT: Record<string, string> = {
   "image/webp": ".webp",
 };
 
-function pickExt(file: File, accepted: Record<string, string>): string {
+// GLB MIME is officially "model/gltf-binary" but browsers often send
+// "application/octet-stream" because .glb isn't a registered system type
+// on every OS. We trust the .glb extension as a fallback signal.
+const MODEL_EXT: Record<string, string> = {
+  "model/gltf-binary": ".glb",
+  "application/octet-stream": ".glb",
+};
+
+function allowListFor(accept: AcceptKind): Record<string, string> {
+  switch (accept) {
+    case "video":
+      return VIDEO_EXT;
+    case "image":
+      return IMAGE_EXT;
+    case "model":
+      return MODEL_EXT;
+  }
+}
+
+function pickExt(file: File, accepted: Record<string, string>, accept: AcceptKind): string {
+  // For model files, prefer the filename extension (browsers often report
+  // application/octet-stream regardless of source).
+  if (accept === "model") {
+    const fromName = extname(file.name).toLowerCase();
+    if (fromName === ".glb") return ".glb";
+  }
   const fromMime = accepted[file.type];
   if (fromMime) return fromMime;
   const fromName = extname(file.name).toLowerCase();
@@ -38,7 +65,7 @@ async function writeFile(
   file: File,
   kind: "dresscodes" | "vehicles",
   slug: string,
-  accept: "video" | "image",
+  accept: AcceptKind,
 ): Promise<string> {
   if (file.size === 0) {
     throw new Error("Empty file.");
@@ -48,14 +75,25 @@ async function writeFile(
       `File exceeds ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB limit.`,
     );
   }
-  const allowList = accept === "video" ? VIDEO_EXT : IMAGE_EXT;
   if (accept === "video" && !file.type.startsWith("video/")) {
     throw new Error("Expected a video file.");
   }
   if (accept === "image" && !file.type.startsWith("image/")) {
     throw new Error("Expected an image file.");
   }
-  const ext = pickExt(file, allowList);
+  if (accept === "model") {
+    // The browser may not recognize .glb; trust extension OR mime.
+    const ext = extname(file.name).toLowerCase();
+    const okMime =
+      file.type === "model/gltf-binary" ||
+      file.type === "application/octet-stream" ||
+      file.type === "";
+    if (ext !== ".glb" && !okMime) {
+      throw new Error("Expected a .glb model file.");
+    }
+  }
+
+  const ext = pickExt(file, allowListFor(accept), accept);
 
   const dir = `${PUBLIC_DIR}/assets/${kind}`;
   await mkdir(dir, { recursive: true });
@@ -76,7 +114,7 @@ export async function writeDresscodeAsset(
 export async function writeVehicleAsset(
   file: File,
   slug: string,
-  accept: "video" | "image",
+  accept: "model" | "image",
 ): Promise<string> {
   return writeFile(file, "vehicles", slug, accept);
 }

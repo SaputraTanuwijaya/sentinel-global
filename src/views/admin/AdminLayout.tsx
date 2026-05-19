@@ -34,6 +34,24 @@ export const AdminLayout = ({ title, active, children }: Props) => {
         <title>Sentinel Global | {title}</title>
         <link rel="stylesheet" href="/public/styles.css" />
         <script src="/public/js/htmx.min.js"></script>
+        {/* htmx v2 default skips 4xx swaps, so server-rendered error forms
+            never reach the DOM and the user only sees a console error. We
+            opt 4xx into swap-with-error so validation flashes render in
+            place. Mirrors the same config block in the wizard Layout. */}
+        <script>
+          {`
+            document.addEventListener('DOMContentLoaded', function () {
+              if (window.htmx && window.htmx.config) {
+                window.htmx.config.responseHandling = [
+                  { code: '204', swap: false },
+                  { code: '[23]..', swap: true },
+                  { code: '[45]..', swap: true, error: true },
+                  { code: '...', swap: false, error: true },
+                ];
+              }
+            });
+          `}
+        </script>
       </head>
       <body class="bg-black text-white font-mono min-h-screen antialiased">
         <div class="flex min-h-screen">

@@ -4,6 +4,11 @@ import { jwtPlugin, requireAdmin } from "../../core/auth";
 import { MissionService } from "../../services/MissionService";
 import { PricingService } from "../../services/PricingService";
 import { DresscodeService } from "../../services/DresscodeService";
+import {
+  VehicleService,
+  VEHICLE_CATEGORIES,
+  VEHICLE_SLUG_RE,
+} from "../../services/VehicleService";
 import { AdminLayout } from "../../views/admin/AdminLayout";
 import {
   AdminDashboard,
@@ -25,7 +30,43 @@ import {
   DresscodeEdit,
   DresscodeFormWrapper,
 } from "../../views/admin/DresscodeEdit";
-import { writeDresscodeAsset, MAX_UPLOAD_BYTES } from "../../core/uploads";
+import {
+  VehiclesGrid,
+  VehicleCard,
+} from "../../views/admin/Vehicles";
+import {
+  VehicleEdit,
+  VehicleFormWrapper,
+} from "../../views/admin/VehicleEdit";
+import {
+  writeDresscodeAsset,
+  writeVehicleAsset,
+  MAX_UPLOAD_BYTES,
+} from "../../core/uploads";
+
+// VehicleEdit's inline JS aggregates the spec rows into a JSON string and
+// drops it onto the form via hx-vals. We parse here, but only shape-check —
+// the authoritative bounds (key/value lengths, max entries) live in
+// VehicleService.validate so client and route layers stay thin.
+function parseSpecsField(raw: unknown): Record<string, string> {
+  if (raw == null || raw === "") return {};
+  if (typeof raw !== "string") return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return {};
+    }
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof k === "string" && typeof v === "string" && k.length > 0) {
+        out[k] = v;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 export const adminRouter = new Elysia({ prefix: "/admin" })
   .use(jwtPlugin)
@@ -458,6 +499,300 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
         return <DresscodeCard d={d} />;
       } catch (err: any) {
         console.error("/// DRESSCODE REACTIVATE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not reactivate."} />;
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  // ─── Vehicles ─────────────────────────────────────────────────────────────
+
+  .get(
+    "/vehicles",
+    async ({ query }) => {
+      try {
+        const category = typeof query.category === "string" ? query.category : undefined;
+        const vehicles = await VehicleService.listAll({ category });
+        return (
+          <AdminLayout title="Vehicles" active="vehicles">
+            <VehiclesGrid vehicles={vehicles} category={category} />
+          </AdminLayout>
+        );
+      } catch (err: any) {
+        console.error("/// ADMIN VEHICLES LOAD FAILED ///", err?.message ?? err);
+        return (
+          <AdminLayout title="Vehicles" active="vehicles">
+            <AdminError message="Could not load vehicles." />
+          </AdminLayout>
+        );
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .get(
+    "/vehicles/new",
+    async () => (
+      <AdminLayout title="New vehicle" active="vehicles">
+        <VehicleFormWrapper mode="create" />
+      </AdminLayout>
+    ),
+    { beforeHandle: requireAdmin },
+  )
+
+  .get(
+    "/vehicles/:id",
+    async ({ params, set }) => {
+      const v = await VehicleService.get(params.id);
+      if (!v) {
+        set.status = 404;
+        return (
+          <AdminLayout title="Not found" active="vehicles">
+            <AdminError message={`No vehicle with id ${params.id}.`} />
+          </AdminLayout>
+        );
+      }
+      return (
+        <AdminLayout title={`Edit · ${v.label}`} active="vehicles">
+          <VehicleFormWrapper mode="edit" values={v} />
+        </AdminLayout>
+      );
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .post(
+    "/vehicles",
+    async ({ body, set }) => {
+      const id = String(body.id ?? "").trim();
+      const label = String(body.label ?? "").trim();
+      // Checkboxes with the same `name="categories"` arrive as an array
+      // when multiple are checked, a single string when one is checked,
+      // and undefined when none are. Normalize.
+      const rawCats = (body as any).categories;
+      const categories: string[] = Array.isArray(rawCats)
+        ? rawCats.map(String)
+        : rawCats != null
+          ? [String(rawCats)]
+          : [];
+      const description = body.description ? String(body.description) : null;
+      const scale =
+        body.scale !== undefined && body.scale !== ""
+          ? Number(body.scale)
+          : 1.0;
+      const model_rotation_y_deg =
+        body.model_rotation_y_deg !== undefined &&
+        body.model_rotation_y_deg !== ""
+          ? Number(body.model_rotation_y_deg)
+          : 0;
+      const price_cents =
+        body.price_dollars !== undefined && body.price_dollars !== ""
+          ? Math.round(Number(body.price_dollars) * 100)
+          : 0;
+      const specs = parseSpecsField(body.specs_json);
+
+      const renderError = (msg: string) => {
+        set.status = 400;
+        return (
+          <VehicleFormWrapper
+            mode="create"
+            values={{
+              id,
+              label,
+              categories: categories as any,
+              category: (categories[0] ?? "PRINCIPAL") as any,
+              description,
+              scale,
+              model_rotation_y_deg,
+              price_cents,
+              specs,
+            }}
+            flash={{ kind: "error", message: msg }}
+          />
+        );
+      };
+
+      try {
+        // Validate the slug BEFORE touching the filesystem. HTMX submits
+        // bypass HTML5 `pattern` validation, so a browser-side check isn't
+        // enough — without this gate, a bad slug 400s the DB insert but
+        // leaves an orphan upload on disk (e.g. "Rolls Royce Ghost.glb").
+        if (!VEHICLE_SLUG_RE.test(id)) {
+          return renderError(
+            "ID must start with a letter and contain only letters, digits, _ or -. No spaces.",
+          );
+        }
+        const m = body.model as File | undefined;
+        const t = body.thumbnail as File | undefined;
+        if (!m || m.size === 0) {
+          return renderError("A GLB model is required.");
+        }
+        const model_path = await writeVehicleAsset(m, id, "model");
+        let thumbnail_path: string | null = null;
+        if (t && t.size > 0) {
+          thumbnail_path = await writeVehicleAsset(t, id, "image");
+        }
+        await VehicleService.create({
+          id,
+          label,
+          categories,
+          description,
+          model_path,
+          thumbnail_path,
+          scale,
+          model_rotation_y_deg,
+          price_cents,
+          specs,
+        });
+        set.headers["HX-Redirect"] = `/admin/vehicles/${id}`;
+        return "";
+      } catch (err: any) {
+        console.error("/// VEHICLE CREATE FAILED ///", err?.message ?? err);
+        return renderError(err?.message ?? "Could not create vehicle.");
+      }
+    },
+    {
+      body: t.Object({
+        id: t.String(),
+        label: t.String(),
+        // Multiple checkboxes share name="categories"; Elysia may produce
+        // string | string[] | undefined. Accept the union and normalize.
+        categories: t.Optional(
+          t.Union([t.String(), t.Array(t.String())]),
+        ),
+        description: t.Optional(t.String()),
+        scale: t.Optional(t.String()),
+        model_rotation_y_deg: t.Optional(t.String()),
+        price_dollars: t.Optional(t.String()),
+        // JSON string built by VehicleEdit's inline serializer (hx-vals).
+        // Server validates shape — see parseSpecsField below.
+        specs_json: t.Optional(t.String()),
+        status: t.Optional(t.String()),
+        model: t.Optional(t.File({ maxSize: MAX_UPLOAD_BYTES })),
+        thumbnail: t.Optional(t.File({ maxSize: MAX_UPLOAD_BYTES })),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .patch(
+    "/vehicles/:id",
+    async ({ params, body, set }) => {
+      const existing = await VehicleService.get(params.id);
+      if (!existing) {
+        set.status = 404;
+        return (
+          <VehicleFormWrapper
+            mode="edit"
+            values={{ id: params.id }}
+            flash={{ kind: "error", message: "Vehicle not found." }}
+          />
+        );
+      }
+
+      const patch: any = {};
+      if (body.label !== undefined) patch.label = String(body.label).trim();
+      // Categories arrives as undefined / string / string[]; the form
+      // always includes the field (with at least one checked), so a fully
+      // missing value means "no change", a string means one checked, an
+      // array means many.
+      const rawCats = (body as any).categories;
+      if (rawCats !== undefined) {
+        patch.categories = Array.isArray(rawCats)
+          ? rawCats.map(String)
+          : [String(rawCats)];
+      }
+      if (body.description !== undefined)
+        patch.description = body.description ? String(body.description) : null;
+      if (body.scale !== undefined && body.scale !== "")
+        patch.scale = Number(body.scale);
+      if (body.model_rotation_y_deg !== undefined &&
+          body.model_rotation_y_deg !== "")
+        patch.model_rotation_y_deg = Number(body.model_rotation_y_deg);
+      if (body.price_dollars !== undefined && body.price_dollars !== "")
+        patch.price_cents = Math.round(Number(body.price_dollars) * 100);
+      // `specs_json` is always present in the form payload (the inline
+      // serializer emits "{}" for an empty list), so an undefined here
+      // means the form didn't include the field at all. Either way we
+      // only touch the column when something was sent.
+      if (body.specs_json !== undefined) {
+        patch.specs = parseSpecsField(body.specs_json);
+      }
+      if (body.status !== undefined) patch.status = String(body.status);
+
+      try {
+        const m = body.model as File | undefined;
+        const t = body.thumbnail as File | undefined;
+        if (m && m.size > 0) {
+          patch.model_path = await writeVehicleAsset(m, params.id, "model");
+        }
+        if (t && t.size > 0) {
+          patch.thumbnail_path = await writeVehicleAsset(t, params.id, "image");
+        }
+        const updated = await VehicleService.update(params.id, patch);
+        return (
+          <VehicleFormWrapper
+            mode="edit"
+            values={updated}
+            flash={{ kind: "success", message: "Saved." }}
+          />
+        );
+      } catch (err: any) {
+        console.error("/// VEHICLE UPDATE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return (
+          <VehicleFormWrapper
+            mode="edit"
+            values={{ ...existing, ...patch }}
+            flash={{ kind: "error", message: err?.message ?? "Could not save." }}
+          />
+        );
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        label: t.Optional(t.String()),
+        categories: t.Optional(
+          t.Union([t.String(), t.Array(t.String())]),
+        ),
+        description: t.Optional(t.String()),
+        scale: t.Optional(t.String()),
+        model_rotation_y_deg: t.Optional(t.String()),
+        price_dollars: t.Optional(t.String()),
+        specs_json: t.Optional(t.String()),
+        status: t.Optional(t.String()),
+        model: t.Optional(t.File({ maxSize: MAX_UPLOAD_BYTES })),
+        thumbnail: t.Optional(t.File({ maxSize: MAX_UPLOAD_BYTES })),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .delete(
+    "/vehicles/:id",
+    async ({ params, set }) => {
+      try {
+        const v = await VehicleService.archive(params.id);
+        return <VehicleCard v={v} />;
+      } catch (err: any) {
+        console.error("/// VEHICLE ARCHIVE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not archive."} />;
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .patch(
+    "/vehicles/:id/reactivate",
+    async ({ params, set }) => {
+      try {
+        const v = await VehicleService.reactivate(params.id);
+        return <VehicleCard v={v} />;
+      } catch (err: any) {
+        console.error("/// VEHICLE REACTIVATE FAILED ///", err?.message ?? err);
         set.status = 400;
         return <AdminError message={err?.message ?? "Could not reactivate."} />;
       }

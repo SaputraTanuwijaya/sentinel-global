@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "bun run --watch src/index.tsx",
     "css": "tailwindcss -i ./src/input.css -o ./src/public/styles.css --watch",
-    "build:client": "bun build ./src/client/index.ts --outdir ./src/public/js --watch"
+    "build:client": "bun build ./src/client/index.ts --outdir ./src/public/js --watch",
+    "build:admin-client": "bun build ./src/client/admin/index.ts --outfile ./src/public/js/admin.js --watch"
   },
   "private": true,
   "devDependencies": {

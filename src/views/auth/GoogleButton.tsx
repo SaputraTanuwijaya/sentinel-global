@@ -1,8 +1,11 @@
 import { Html } from "@elysiajs/html";
 
-export const GoogleButton = ({ label = "Continue with Google" }: { label?: string } = {}) => (
+export const GoogleButton = ({
+  label = "Continue with Google",
+  next,
+}: { label?: string; next?: string } = {}) => (
   <a
-    href="/auth/google"
+    href={next ? `/auth/google?next=${encodeURIComponent(next)}` : "/auth/google"}
     style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.65);font-size:10px;letter-spacing:0.22em;text-transform:uppercase;padding:13px;text-decoration:none;font-family:'JetBrains Mono','Courier New',monospace;transition:border-color 0.15s,color 0.15s,background-color 0.15s;cursor:pointer;"
     onmouseover="this.style.borderColor='rgba(212,175,55,0.45)';this.style.color='white';this.style.backgroundColor='rgba(255,255,255,0.06)';"
     onmouseout="this.style.borderColor='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.65)';this.style.backgroundColor='rgba(255,255,255,0.03)';"

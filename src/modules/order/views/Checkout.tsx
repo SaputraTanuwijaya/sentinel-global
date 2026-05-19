@@ -131,6 +131,11 @@ export const Checkout = () => {
             hx-trigger="submit"
             hx-swap="innerHTML"
             hx-target="#ui-layer"
+            hx-vals='js:{
+              cardnumber: (document.getElementById("cn1")||{}).value + (document.getElementById("cn2")||{}).value + (document.getElementById("cn3")||{}).value + (document.getElementById("cn4")||{}).value,
+              expiry: ((document.getElementById("expiry-mm")||{}).value || "") + "/" + ((document.getElementById("expiry-yy")||{}).value || ""),
+              missionState: JSON.stringify(window.MissionState || {})
+            }'
             onsubmit="window.handleDeployment(event)"
           >
             {/* Cardholder Name */}
@@ -161,9 +166,12 @@ export const Checkout = () => {
                 </span>
               </label>
               <div class="flex items-center gap-2">
+                {/* No `name` on the 4-segment inputs: they are UI scaffolding.
+                    The composed value is delivered via `hx-vals.cardnumber`
+                    above. Naming them would push extra fields into the request
+                    body that fail the route's strict body schema (422). */}
                 <input
                   type="tel"
-                  name="cn1"
                   id="cn1"
                   maxlength="4"
                   placeholder="XXXX"
@@ -173,7 +181,6 @@ export const Checkout = () => {
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
                   type="tel"
-                  name="cn2"
                   id="cn2"
                   maxlength="4"
                   placeholder="XXXX"
@@ -184,7 +191,6 @@ export const Checkout = () => {
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
                   type="tel"
-                  name="cn3"
                   id="cn3"
                   maxlength="4"
                   placeholder="XXXX"
@@ -195,7 +201,6 @@ export const Checkout = () => {
                 <span class="text-white/20 font-mono text-xs">—</span>
                 <input
                   type="tel"
-                  name="cn4"
                   id="cn4"
                   maxlength="4"
                   placeholder="XXXX"
@@ -216,9 +221,10 @@ export const Checkout = () => {
                   </span>
                 </label>
                 <div class="flex items-center gap-2">
+                  {/* Same rationale as the card-number segments — no `name`;
+                      composed value goes through `hx-vals.expiry`. */}
                   <input
                     type="tel"
-                    name="expiry-mm"
                     id="expiry-mm"
                     placeholder="MM"
                     maxlength="2"
@@ -242,7 +248,6 @@ export const Checkout = () => {
                   <span class="text-white/30 font-mono">/</span>
                   <input
                     type="tel"
-                    name="expiry-yy"
                     id="expiry-yy"
                     placeholder="YY"
                     maxlength="2"
@@ -457,25 +462,18 @@ export const Checkout = () => {
               if (cvc.length !== 3) { document.getElementById('cvc-error').classList.remove('hidden'); valid = false; }
 
               if (!valid) {
-                e.preventDefault(); 
+                e.preventDefault();
                 const btn = form.querySelector('button[type="submit"]');
                 btn.classList.add('bg-red-500', 'text-white');
                 setTimeout(() => btn.classList.remove('bg-red-500', 'text-white'), 1000);
                 return;
               }
 
-              // HTMX ht-post
-              const inject = (fieldName, value) => {
-                const el = document.createElement('input');
-                el.type = 'hidden';
-                el.name = fieldName;
-                el.value = value;
-                form.appendChild(el);
-              };
-              
-              inject('cardnumber', cardNumber);
-              inject('expiry', mm + '/' + yy);
-              inject('missionState', JSON.stringify(window.MissionState));
+              // Computed fields (cardnumber, expiry, missionState) are added
+              // by HTMX's hx-vals at submission time — see the <form> attrs.
+              // This is more robust than appending hidden inputs from inside
+              // the submit handler, where HTMX may have already snapshotted
+              // the form data depending on listener registration order.
             };
 
             if (window.Sentinel) window.Sentinel.changeBackground('black');
