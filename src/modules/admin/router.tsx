@@ -9,6 +9,10 @@ import {
   VEHICLE_CATEGORIES,
   VEHICLE_SLUG_RE,
 } from "../../services/VehicleService";
+import {
+  FormationService,
+  FORMATION_TIERS,
+} from "../../services/FormationService";
 import { AdminLayout } from "../../views/admin/AdminLayout";
 import {
   AdminDashboard,
@@ -38,6 +42,16 @@ import {
   VehicleEdit,
   VehicleFormWrapper,
 } from "../../views/admin/VehicleEdit";
+import {
+  FormationsGrid,
+  FormationCard,
+  FormationCreateForm,
+} from "../../views/admin/Formations";
+import {
+  SlotEditorPage,
+  SlotFragment,
+  SettingsPanel,
+} from "../../views/admin/SlotEditor";
 import {
   writeDresscodeAsset,
   writeVehicleAsset,
@@ -798,4 +812,362 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
       }
     },
     { beforeHandle: requireAdmin },
+  )
+
+  // ─── Formations ───────────────────────────────────────────────────────────
+
+  .get(
+    "/formations",
+    async () => {
+      try {
+        const [formations, slotCounts] = await Promise.all([
+          FormationService.listAll(),
+          FormationService.slotCounts(),
+        ]);
+        return (
+          <AdminLayout title="Formations" active="formations">
+            <FormationsGrid
+              formations={formations}
+              slotCounts={slotCounts}
+            />
+          </AdminLayout>
+        );
+      } catch (err: any) {
+        console.error(
+          "/// ADMIN FORMATIONS LOAD FAILED ///",
+          err?.message ?? err,
+        );
+        return (
+          <AdminLayout title="Formations" active="formations">
+            <AdminError message="Could not load formations." />
+          </AdminLayout>
+        );
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .get(
+    "/formations/new",
+    async () => (
+      <AdminLayout title="New formation" active="formations">
+        <FormationCreateForm />
+      </AdminLayout>
+    ),
+    { beforeHandle: requireAdmin },
+  )
+
+  .post(
+    "/formations",
+    async ({ body, set }) => {
+      const id = String(body.id ?? "").trim();
+      const label = String(body.label ?? "").trim();
+      const description = body.description ? String(body.description) : null;
+      const tier_id =
+        body.tier_id !== undefined && body.tier_id !== ""
+          ? String(body.tier_id)
+          : null;
+      const canvas_width =
+        body.canvas_width !== undefined && body.canvas_width !== ""
+          ? Number(body.canvas_width)
+          : 60;
+      const canvas_depth =
+        body.canvas_depth !== undefined && body.canvas_depth !== ""
+          ? Number(body.canvas_depth)
+          : 200;
+
+      const renderError = (msg: string) => {
+        set.status = 400;
+        return (
+          <FormationCreateForm
+            values={{
+              id,
+              label,
+              description,
+              tier_id,
+              canvas_width,
+              canvas_depth,
+            }}
+            flash={{ kind: "error", message: msg }}
+          />
+        );
+      };
+
+      try {
+        await FormationService.create({
+          id,
+          label,
+          description,
+          tier_id,
+          canvas_width,
+          canvas_depth,
+        });
+        set.headers["HX-Redirect"] = `/admin/formations/${id}`;
+        return "";
+      } catch (err: any) {
+        console.error("/// FORMATION CREATE FAILED ///", err?.message ?? err);
+        return renderError(err?.message ?? "Could not create formation.");
+      }
+    },
+    {
+      body: t.Object({
+        id: t.String(),
+        label: t.String(),
+        description: t.Optional(t.String()),
+        tier_id: t.Optional(t.String()),
+        canvas_width: t.Optional(t.String()),
+        canvas_depth: t.Optional(t.String()),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .get(
+    "/formations/:id",
+    async ({ params, set }) => {
+      try {
+        const formation = await FormationService.getWithSlots(params.id);
+        if (!formation) {
+          set.status = 404;
+          return (
+            <AdminLayout title="Not found" active="formations">
+              <AdminError message={`No formation with id ${params.id}.`} />
+            </AdminLayout>
+          );
+        }
+        return (
+          <AdminLayout
+            title={`Edit · ${formation.label}`}
+            active="formations"
+          >
+            <SlotEditorPage formation={formation} />
+          </AdminLayout>
+        );
+      } catch (err: any) {
+        console.error(
+          "/// ADMIN FORMATION DETAIL FAILED ///",
+          err?.message ?? err,
+        );
+        set.status = 500;
+        return (
+          <AdminLayout title="Formation" active="formations">
+            <AdminError message="Could not load formation." />
+          </AdminLayout>
+        );
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .patch(
+    "/formations/:id",
+    async ({ params, body, set, headers }) => {
+      const existing = await FormationService.get(params.id);
+      if (!existing) {
+        set.status = 404;
+        return (
+          <AdminError message={`No formation with id ${params.id}.`} />
+        );
+      }
+
+      const patch: any = {};
+      if (body.label !== undefined) patch.label = String(body.label).trim();
+      if (body.description !== undefined)
+        patch.description = body.description ? String(body.description) : null;
+      if (body.tier_id !== undefined)
+        patch.tier_id = body.tier_id ? String(body.tier_id) : null;
+      if (body.canvas_width !== undefined && body.canvas_width !== "")
+        patch.canvas_width = Number(body.canvas_width);
+      if (body.canvas_depth !== undefined && body.canvas_depth !== "")
+        patch.canvas_depth = Number(body.canvas_depth);
+      if (body.status !== undefined) patch.status = String(body.status);
+
+      try {
+        const updated = await FormationService.update(params.id, patch);
+        // Resizing the canvas changes every slot's screenY = depth - z, so a
+        // partial swap of just the settings panel would leave the SVG stale.
+        // Trigger a full re-render via HX-Refresh in that case only.
+        const canvasResized =
+          patch.canvas_width !== undefined &&
+            patch.canvas_width !== existing.canvas_width ||
+          patch.canvas_depth !== undefined &&
+            patch.canvas_depth !== existing.canvas_depth;
+        if (canvasResized) {
+          set.headers["HX-Refresh"] = "true";
+          return "";
+        }
+        return (
+          <SettingsPanel
+            f={updated}
+            flash={{ kind: "success", message: "Saved." }}
+          />
+        );
+      } catch (err: any) {
+        console.error("/// FORMATION UPDATE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return (
+          <SettingsPanel
+            f={{ ...existing, ...patch }}
+            flash={{ kind: "error", message: err?.message ?? "Could not save." }}
+          />
+        );
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        label: t.Optional(t.String()),
+        description: t.Optional(t.String()),
+        tier_id: t.Optional(t.String()),
+        canvas_width: t.Optional(t.String()),
+        canvas_depth: t.Optional(t.String()),
+        status: t.Optional(t.String()),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .delete(
+    "/formations/:id",
+    async ({ params, set }) => {
+      try {
+        const f = await FormationService.archive(params.id);
+        const counts = await FormationService.slotCounts();
+        return <FormationCard f={f} slotCount={counts.get(f.id) ?? 0} />;
+      } catch (err: any) {
+        console.error("/// FORMATION ARCHIVE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not archive."} />;
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .patch(
+    "/formations/:id/reactivate",
+    async ({ params, set }) => {
+      try {
+        const f = await FormationService.reactivate(params.id);
+        const counts = await FormationService.slotCounts();
+        return <FormationCard f={f} slotCount={counts.get(f.id) ?? 0} />;
+      } catch (err: any) {
+        console.error(
+          "/// FORMATION REACTIVATE FAILED ///",
+          err?.message ?? err,
+        );
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not reactivate."} />;
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  // ─── Slots ────────────────────────────────────────────────────────────────
+
+  .post(
+    "/formations/:id/slots",
+    async ({ params, body, set }) => {
+      try {
+        const formation = await FormationService.get(params.id);
+        if (!formation) {
+          set.status = 404;
+          return <AdminError message="Formation not found." />;
+        }
+        const slot = await FormationService.addSlot(params.id, {
+          label: body.label ?? null,
+          x: Number(body.x),
+          z: Number(body.z),
+          rotation_deg: body.rotation_deg ?? 0,
+          allowed_categories: body.allowed_categories ?? [],
+        });
+        return (
+          <SlotFragment
+            slot={slot}
+            depth={formation.canvas_depth}
+            selected
+          />
+        );
+      } catch (err: any) {
+        console.error("/// SLOT CREATE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not add slot."} />;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        label: t.Optional(t.Union([t.String(), t.Null()])),
+        x: t.Number(),
+        z: t.Number(),
+        rotation_deg: t.Optional(t.Number()),
+        allowed_categories: t.Array(t.String()),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .patch(
+    "/slots/:id",
+    async ({ params, body, set }) => {
+      try {
+        const existing = await FormationService.getSlot(params.id);
+        if (!existing) {
+          set.status = 404;
+          return <AdminError message="Slot not found." />;
+        }
+        const formation = await FormationService.get(existing.formation_id);
+        const patch: any = {};
+        if (body.label !== undefined) patch.label = body.label;
+        if (body.x !== undefined) patch.x = Number(body.x);
+        if (body.z !== undefined) patch.z = Number(body.z);
+        if (body.rotation_deg !== undefined)
+          patch.rotation_deg = Number(body.rotation_deg);
+        if (body.allowed_categories !== undefined)
+          patch.allowed_categories = body.allowed_categories;
+        const slot = await FormationService.updateSlot(params.id, patch);
+        return (
+          <SlotFragment
+            slot={slot}
+            depth={formation?.canvas_depth ?? 200}
+            selected={body.keepSelected ?? false}
+          />
+        );
+      } catch (err: any) {
+        console.error("/// SLOT UPDATE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not update slot."} />;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        label: t.Optional(t.Union([t.String(), t.Null()])),
+        x: t.Optional(t.Number()),
+        z: t.Optional(t.Number()),
+        rotation_deg: t.Optional(t.Number()),
+        allowed_categories: t.Optional(t.Array(t.String())),
+        keepSelected: t.Optional(t.Boolean()),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
+  .delete(
+    "/slots/:id",
+    async ({ params, set }) => {
+      try {
+        await FormationService.deleteSlot(params.id);
+        // Client removes the <g> on success; nothing to swap.
+        set.status = 200;
+        return "";
+      } catch (err: any) {
+        console.error("/// SLOT DELETE FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not delete slot."} />;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      beforeHandle: requireAdmin,
+    },
   );
