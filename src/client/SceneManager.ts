@@ -45,6 +45,14 @@ export class SceneManager {
   private mouse = new THREE.Vector2();
   private resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Fallback layout used when the catalog manifest has no admin-chosen
+  // default formation for the requested tier (e.g. layout boot races wizard
+  // entry, or admin archived the default without picking a replacement).
+  // Source of truth in production is `window.__FORMATIONS__[tier]` —
+  // populated from `/api/catalog/manifest.json`, ultimately from the
+  // `formations` + `slots` tables (see `FormationService.activeDefaultsByTier`).
+  // Identical across tiers here to match the v1 behaviour exactly; the seed
+  // in `scripts/migrate-admin.ts` mirrors this and admins can diverge.
   private readonly TIER_CONFIG: Record<string, any[]> = {
     Vanguard: [
       { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff }, // Cyan
@@ -67,6 +75,19 @@ export class SceneManager {
       { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },
       { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },
     ],
+  };
+
+  // Role → hex colour for slot rings + spotlight pools. Mirrors the swatch
+  // map in `src/views/admin/SlotEditor.tsx` (ROLE_COLOR) — single source of
+  // truth is the seed, but the wizard runs without server context so we
+  // duplicate the literal here. Keep these two in sync.
+  private readonly ROLE_COLOR_HEX: Record<string, number> = {
+    PRINCIPAL: 0xeab308,
+    LEAD: 0x94a3b8,
+    REAR: 0x3b82f6,
+    SWEEPER: 0x06b6d4,
+    CAT: 0xef4444,
+    ECM: 0xa855f7,
   };
 
   // Camera Lerping
@@ -611,11 +632,9 @@ export class SceneManager {
       p.visible = false;
     });
 
-    // Reset Camera to Side View
-    this.cameraTargetPos.set(25, 8, 0);
-    this.cameraLookAt.set(0, 0, 0);
-    this.camera.position.copy(this.cameraTargetPos);
-    this.camera.lookAt(this.cameraLookAt);
+    // Camera reset is deferred until after we resolve the slot config —
+    // we want to centre on the formation centroid, which depends on which
+    // formation (admin's default vs built-in fallback) we end up using.
 
     // Clear old lights/beams but KEEP the slotGroup reference
     this.motorcadeSpotLights.forEach((light) => {
@@ -632,7 +651,58 @@ export class SceneManager {
     this.slotGroup.clear();
     this.scene.add(this.slotGroup);
 
-    const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    // Prefer the admin-chosen default formation for this tier (sourced
+    // from /api/catalog/manifest.json → window.__FORMATIONS__). Fall back
+    // to the hardcoded TIER_CONFIG when the manifest hasn't arrived yet
+    // or no default is set for the tier. The shape mismatch (DB slots
+    // have uuid id + allowed_categories[] vs TIER_CONFIG's numeric id +
+    // single role) is normalised here so downstream code stays uniform.
+    const fromManifest = (window as any).__FORMATIONS__?.[tier];
+    let config: any[];
+    if (
+      fromManifest &&
+      Array.isArray(fromManifest.slots) &&
+      fromManifest.slots.length > 0
+    ) {
+      config = fromManifest.slots.map((s: any, idx: number) => {
+        const role =
+          s.role ??
+          (Array.isArray(s.allowed_categories)
+            ? s.allowed_categories[0]
+            : "LEAD");
+        return {
+          id: idx, // sequential numeric id for slotGroup userData (matches focusOnSlot semantics)
+          role,
+          x: Number(s.x) || 0,
+          z: Number(s.z) || 0,
+          color: this.ROLE_COLOR_HEX[role] ?? 0x888888,
+          // Carried through for the garage drawer's vehicle-role filter.
+          allowed_categories: Array.isArray(s.allowed_categories)
+            ? s.allowed_categories
+            : [role],
+        };
+      });
+    } else {
+      config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    }
+
+    // Centre the camera on the slot centroid so admin-defined formations
+    // (which can sit anywhere in their canvas) frame the same way the
+    // built-in TIER_CONFIG (centred on z=0) does. x stays at 25 for the
+    // side-view; lookAt y is 0 so we look at ground level.
+    const centroidZ =
+      config.length > 0
+        ? config.reduce((acc: number, s: any) => acc + (Number(s.z) || 0), 0) /
+          config.length
+        : 0;
+    this.cameraTargetPos.set(25, 8, centroidZ);
+    this.cameraLookAt.set(0, 0, centroidZ);
+    this.camera.position.copy(this.cameraTargetPos);
+    this.camera.lookAt(this.cameraLookAt);
+    if (this.controls) {
+      this.controls.target.set(0, 0, centroidZ);
+      this.controls.update();
+    }
 
     // RESTORE VEHICLE VISIBILITY
     this.loadedVehicles.forEach((v) => {

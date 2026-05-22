@@ -186,6 +186,12 @@ export const Layout = ({ children }: { children: any }) => {
                      // (model_path) and Motorcade.tsx (label, thumbnail).
                      window.__VEHICLES__ = {};
                      for (const v of (m.vehicles || [])) window.__VEHICLES__[v.id] = v;
+                     // Formation defaults are the source of truth for the
+                     // motorcade slot layout. SceneManager reads this in
+                     // initMotorcadeMode; falls back to its built-in
+                     // TIER_CONFIG if the manifest is missing / a tier has
+                     // no admin-chosen default.
+                     window.__FORMATIONS__ = (m.formations && m.formations.defaults) || {};
                      document.body.dispatchEvent(new CustomEvent('sentinel-catalog-ready'));
                      const lc = document.getElementById('mission-ledger-container');
                      const ledgerVisible = lc && lc.classList.contains('opacity-100');

@@ -20,6 +20,9 @@ export type Formation = {
   canvas_width: number;
   canvas_depth: number;
   status: "active" | "archived";
+  /** True iff this is the formation the wizard renders for `tier_id`.
+   *  Enforced one-per-tier by a partial unique index in the migration. */
+  is_default: boolean;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -43,6 +46,7 @@ export type Slot = {
 export type FormationWithSlots = Formation & { slots: Slot[] };
 
 const ACTIVE_KEY = "formations.active";
+const DEFAULTS_KEY = "formations.defaults"; // wizard reads this
 const formationKey = (id: string) => `formation:${id}`;
 
 const SLUG_RE = /^[a-z][a-z0-9_-]{0,62}$/;
@@ -91,6 +95,7 @@ function toFormation(r: any): Formation {
     canvas_width: Number(r.canvas_width ?? 60),
     canvas_depth: Number(r.canvas_depth ?? 200),
     status: (r.status as "active" | "archived") ?? "active",
+    is_default: Number(r.is_default ?? 0) === 1,
     created_at: (r.created_at ?? null) as string | null,
     updated_at: (r.updated_at ?? null) as string | null,
   };
@@ -208,6 +213,54 @@ export class FormationService {
       out.set(String((row as any).formation_id), Number((row as any).n ?? 0));
     }
     return out;
+  }
+
+  /** Bulk slot fetch for the admin grid — one query for N formations so the
+   *  card SVG can render dots without an N+1 round-trip per page render. */
+  static async slotsForFormations(
+    formationIds: string[],
+  ): Promise<Map<string, Slot[]>> {
+    const out = new Map<string, Slot[]>();
+    if (formationIds.length === 0) return out;
+    // Pre-seed every id with an empty array so callers can `.get(id) ?? []`
+    // without a fallback for formations that have no slots yet.
+    for (const id of formationIds) out.set(id, []);
+    const placeholders = formationIds.map(() => "?").join(",");
+    const r = await db.execute({
+      sql: `SELECT * FROM slots
+            WHERE formation_id IN (${placeholders})
+            ORDER BY formation_id, order_index, created_at, id`,
+      args: formationIds,
+    });
+    for (const row of r.rows) {
+      const slot = toSlot(row);
+      const arr = out.get(slot.formation_id);
+      if (arr) arr.push(slot);
+    }
+    return out;
+  }
+
+  /** Default-active formation for every tier. The wizard reads this through
+   *  the catalog manifest — keyed by tier name so SceneManager can do
+   *  `defaults[tier]` directly. Tiers with no current default are absent
+   *  from the map; SceneManager falls back to its TIER_CONFIG. */
+  static async activeDefaultsByTier(): Promise<
+    Map<FormationTier, FormationWithSlots>
+  > {
+    return CatalogCache.get(DEFAULTS_KEY, async () => {
+      const r = await db.execute(
+        `SELECT * FROM formations
+         WHERE is_default = 1 AND status = 'active' AND tier_id IS NOT NULL`,
+      );
+      const formations = r.rows.map(toFormation);
+      const slotsMap = await this.slotsForFormations(formations.map((f) => f.id));
+      const out = new Map<FormationTier, FormationWithSlots>();
+      for (const f of formations) {
+        if (!f.tier_id) continue;
+        out.set(f.tier_id, { ...f, slots: slotsMap.get(f.id) ?? [] });
+      }
+      return out;
+    });
   }
 
   static async getWithSlots(id: string): Promise<FormationWithSlots | null> {
@@ -367,6 +420,7 @@ export class FormationService {
     });
 
     CatalogCache.invalidate(ACTIVE_KEY);
+    CatalogCache.invalidate(DEFAULTS_KEY);
     const fresh = await this.get(input.id);
     if (!fresh) throw new Error("Formation disappeared after insert.");
     return fresh;
@@ -409,6 +463,7 @@ export class FormationService {
     });
 
     CatalogCache.invalidate(ACTIVE_KEY);
+    CatalogCache.invalidate(DEFAULTS_KEY);
     CatalogCache.invalidate(formationKey(id));
     const fresh = await this.get(id);
     if (!fresh) throw new Error("Formation disappeared after update.");
@@ -416,11 +471,56 @@ export class FormationService {
   }
 
   static async archive(id: string): Promise<Formation> {
+    // Archiving the default for a tier silently drops the default. The
+    // wizard falls back to SceneManager.TIER_CONFIG until an admin picks
+    // a new default. We DON'T auto-promote another formation — too magic;
+    // admin should make the choice explicit.
     return this.update(id, { status: "archived" });
   }
 
   static async reactivate(id: string): Promise<Formation> {
     return this.update(id, { status: "active" });
+  }
+
+  /** Mark `id` as the default for its tier and clear any sibling default
+   *  in a single batch so the partial unique index never sees a transient
+   *  duplicate. Throws if the formation is archived or tier-less — both
+   *  are nonsense states for "default in the wizard".
+   *  Caches invalidated: ACTIVE_KEY, DEFAULTS_KEY, per-row formationKey. */
+  static async setDefault(id: string): Promise<Formation> {
+    const target = await this.get(id);
+    if (!target) throw new Error(`Unknown formation: ${id}`);
+    if (target.status === "archived") {
+      throw new Error("Archived formations can't be made default. Reactivate first.");
+    }
+    if (!target.tier_id) {
+      throw new Error("Assign a tier before marking this formation as default.");
+    }
+
+    // libsql batch = single transaction. Clear sibling first; the partial
+    // unique index then accepts our SET. If the target is already default
+    // the clear-step is a no-op and the set-step touches updated_at only.
+    await db.batch([
+      {
+        sql: `UPDATE formations
+              SET is_default = 0, updated_at = CURRENT_TIMESTAMP
+              WHERE tier_id = ? AND is_default = 1 AND id != ?`,
+        args: [target.tier_id, id],
+      },
+      {
+        sql: `UPDATE formations
+              SET is_default = 1, updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+        args: [id],
+      },
+    ]);
+
+    CatalogCache.invalidate(ACTIVE_KEY);
+    CatalogCache.invalidate(DEFAULTS_KEY);
+    CatalogCache.invalidate(formationKey(id));
+    const fresh = await this.get(id);
+    if (!fresh) throw new Error("Formation disappeared after setDefault.");
+    return fresh;
   }
 
   // ─── slot writes ──────────────────────────────────────────────────────────
@@ -464,6 +564,7 @@ export class FormationService {
     });
 
     CatalogCache.invalidate(formationKey(formation_id));
+    CatalogCache.invalidate(DEFAULTS_KEY);
     const fresh = await this.getSlot(id);
     if (!fresh) throw new Error("Slot disappeared after insert.");
     return fresh;
@@ -511,6 +612,7 @@ export class FormationService {
     });
 
     CatalogCache.invalidate(formationKey(existing.formation_id));
+    CatalogCache.invalidate(DEFAULTS_KEY);
     const fresh = await this.getSlot(id);
     if (!fresh) throw new Error("Slot disappeared after update.");
     return fresh;
@@ -526,6 +628,7 @@ export class FormationService {
     });
 
     CatalogCache.invalidate(formationKey(existing.formation_id));
+    CatalogCache.invalidate(DEFAULTS_KEY);
     return { formation_id: existing.formation_id };
   }
 }

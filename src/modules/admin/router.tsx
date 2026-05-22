@@ -824,11 +824,17 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
           FormationService.listAll(),
           FormationService.slotCounts(),
         ]);
+        // Bulk-fetch slots so each FormationCard can render its layout
+        // miniature without an N+1 round-trip per page render.
+        const slotsByFormation = await FormationService.slotsForFormations(
+          formations.map((f) => f.id),
+        );
         return (
           <AdminLayout title="Formations" active="formations">
             <FormationsGrid
               formations={formations}
               slotCounts={slotCounts}
+              slotsByFormation={slotsByFormation}
             />
           </AdminLayout>
         );
@@ -1033,7 +1039,14 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
       try {
         const f = await FormationService.archive(params.id);
         const counts = await FormationService.slotCounts();
-        return <FormationCard f={f} slotCount={counts.get(f.id) ?? 0} />;
+        const slots = await FormationService.listSlots(f.id);
+        return (
+          <FormationCard
+            f={f}
+            slotCount={counts.get(f.id) ?? 0}
+            slots={slots}
+          />
+        );
       } catch (err: any) {
         console.error("/// FORMATION ARCHIVE FAILED ///", err?.message ?? err);
         set.status = 400;
@@ -1049,7 +1062,14 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
       try {
         const f = await FormationService.reactivate(params.id);
         const counts = await FormationService.slotCounts();
-        return <FormationCard f={f} slotCount={counts.get(f.id) ?? 0} />;
+        const slots = await FormationService.listSlots(f.id);
+        return (
+          <FormationCard
+            f={f}
+            slotCount={counts.get(f.id) ?? 0}
+            slots={slots}
+          />
+        );
       } catch (err: any) {
         console.error(
           "/// FORMATION REACTIVATE FAILED ///",
@@ -1057,6 +1077,34 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
         );
         set.status = 400;
         return <AdminError message={err?.message ?? "Could not reactivate."} />;
+      }
+    },
+    { beforeHandle: requireAdmin },
+  )
+
+  .patch(
+    "/formations/:id/default",
+    async ({ params, set }) => {
+      try {
+        const f = await FormationService.setDefault(params.id);
+        const counts = await FormationService.slotCounts();
+        const slots = await FormationService.listSlots(f.id);
+        // Mutual exclusion is DB-enforced, but we only swap the row that
+        // was clicked. The previous default's chip will stay stale until
+        // the admin refreshes — acceptable trade-off vs. broadcasting an
+        // OOB swap for every sibling. If it becomes annoying, return an
+        // OOB <FormationCard> fragment for the sibling too.
+        return (
+          <FormationCard
+            f={f}
+            slotCount={counts.get(f.id) ?? 0}
+            slots={slots}
+          />
+        );
+      } catch (err: any) {
+        console.error("/// FORMATION SETDEFAULT FAILED ///", err?.message ?? err);
+        set.status = 400;
+        return <AdminError message={err?.message ?? "Could not set default."} />;
       }
     },
     { beforeHandle: requireAdmin },

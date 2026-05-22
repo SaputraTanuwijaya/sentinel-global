@@ -40,6 +40,14 @@ const ZOOM_STEP = 1.15;
 const MIN_ZOOM = 1.0;
 const MAX_ZOOM = 20.0;
 
+// Snap-to-grid cycle. 0 = off (free placement, rounds to 0.1m).
+// Anything >0 rounds drag/click-add coords to the nearest multiple. The
+// visual grid in CanvasBackground draws minor lines every 2m, so 1m / 2m
+// snap aligns with the half/full grid cell respectively.
+const SNAP_SIZES = [0, 0.5, 1, 2, 5] as const;
+const SNAP_DEFAULT_INDEX = 2; // 1m
+const SNAP_STORAGE_KEY = "sentinel.slotEditor.snapIndex";
+
 const ROLES = [
   "PRINCIPAL",
   "LEAD",
@@ -247,6 +255,73 @@ export function initSlotEditor(): void {
   });
   zoomFit?.addEventListener("click", fitViewport);
 
+  // ── snap-to-grid ────────────────────────────────────────────────────────
+  //
+  // Snap is a purely client-side UX layer. The server validates and stores
+  // arbitrary floats — snap just controls what we send. Holding Alt during
+  // a drag temporarily disables snap (Figma convention) so fine-tuning
+  // doesn't need a toggle round-trip.
+
+  let altHeld = false;
+  let snapIndex = loadSnapIndex();
+
+  function loadSnapIndex(): number {
+    try {
+      const raw = localStorage.getItem(SNAP_STORAGE_KEY);
+      if (raw === null) return SNAP_DEFAULT_INDEX;
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 0 && n < SNAP_SIZES.length) return n;
+    } catch {
+      /* private mode / storage disabled — fall back to default */
+    }
+    return SNAP_DEFAULT_INDEX;
+  }
+
+  function saveSnapIndex() {
+    try {
+      localStorage.setItem(SNAP_STORAGE_KEY, String(snapIndex));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function currentSnapSize(): number {
+    // Alt overrides to "no snap"; respects the user's saved size otherwise.
+    if (altHeld) return 0;
+    return SNAP_SIZES[snapIndex] ?? 0;
+  }
+
+  // Round to the snap grid; fall back to 1-decimal precision when snap is
+  // off so coords stay readable in the sidebar (no -3.14159… values).
+  function snap(n: number): number {
+    const s = currentSnapSize();
+    if (s <= 0) return round1(n);
+    return Math.round(n / s) * s;
+  }
+
+  const snapToggle = document.getElementById("snap-toggle");
+  const snapReadout = document.getElementById("snap-readout");
+  const snapIndicator = document.getElementById("snap-indicator");
+
+  function paintSnapUi() {
+    const s = SNAP_SIZES[snapIndex] ?? 0;
+    if (snapReadout) {
+      snapReadout.textContent = s <= 0 ? "off" : `${s}m`;
+    }
+    if (snapIndicator) {
+      // Solid accent dot when snap is active; dim gray when off.
+      snapIndicator.classList.toggle("bg-sentinel-accent", s > 0);
+      snapIndicator.classList.toggle("bg-gray-600", s <= 0);
+    }
+  }
+  paintSnapUi();
+
+  snapToggle?.addEventListener("click", () => {
+    snapIndex = (snapIndex + 1) % SNAP_SIZES.length;
+    saveSnapIndex();
+    paintSnapUi();
+  });
+
   // ── pan state (separate from slot drag) ─────────────────────────────────
 
   let spaceHeld = false;
@@ -288,10 +363,12 @@ export function initSlotEditor(): void {
     return { x: local.x, y: local.y };
   }
 
-  // SVG userspace → DB coords (z is mirrored from y).
+  // SVG userspace → DB coords (z is mirrored from y). Snap is applied here
+  // so the popover's add-slot path and any future SVG→DB callers share the
+  // same grid behaviour as drag.
   const svgToDb = (svgX: number, svgY: number) => ({
-    x: round1(svgX),
-    z: round1(depth - svgY),
+    x: snap(svgX),
+    z: snap(depth - svgY),
   });
 
   const dbToTransform = (x: number, z: number, rot: number) =>
@@ -544,11 +621,13 @@ export function initSlotEditor(): void {
     const dy = e.clientY - drag.startClient.y;
     if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
     drag.moved = true;
-    // Convert delta from screen → svg by sampling two screen points.
+    // Convert delta from screen → svg by sampling two screen points, then
+    // snap the final position (not the delta) so successive nudges land on
+    // canonical grid points rather than drifting half-cells.
     const a = screenToSvg(drag.startClient.x, drag.startClient.y);
     const b = screenToSvg(e.clientX, e.clientY);
-    const newX = round1(drag.startDb.x + (b.x - a.x));
-    const newZ = round1(drag.startDb.z - (b.y - a.y));
+    const newX = snap(drag.startDb.x + (b.x - a.x));
+    const newZ = snap(drag.startDb.z - (b.y - a.y));
     setVisualTransform(drag.g, newX, newZ, drag.rotation);
     drag.g.setAttribute("data-x", String(newX));
     drag.g.setAttribute("data-z", String(newZ));
@@ -735,6 +814,31 @@ export function initSlotEditor(): void {
     s === "" || Number.isNaN(Number(s)) ? undefined : Number(s),
   );
 
+  // On blur, snap X/Z to the grid. Done in `change` (not `input`) so the
+  // user can type freely; the value collapses to the grid once focus
+  // leaves. No-op when snap is off (or Alt held — though Alt+blur is rare).
+  function snapOnCommit(el: HTMLInputElement, fieldName: "x" | "z") {
+    el.addEventListener("change", () => {
+      if (!selectedId) return;
+      const raw = Number(el.value);
+      if (!Number.isFinite(raw)) return;
+      const snapped = snap(raw);
+      if (snapped === raw) return;
+      el.value = String(snapped);
+      const g = findSlotGroup(selectedId);
+      if (g) {
+        const x = fieldName === "x" ? snapped : Number(g.getAttribute("data-x") ?? 0);
+        const z = fieldName === "z" ? snapped : Number(g.getAttribute("data-z") ?? 0);
+        const rot = Number(g.getAttribute("data-rotation") ?? 0);
+        setVisualTransform(g, x, z, rot);
+        g.setAttribute(`data-${fieldName}`, String(snapped));
+      }
+      queuePatch(selectedId, { [fieldName]: snapped });
+    });
+  }
+  snapOnCommit(detailX, "x");
+  snapOnCommit(detailZ, "z");
+
   detailRoles
     .querySelectorAll<HTMLInputElement>("input[name=detail-role]")
     .forEach((cb) => {
@@ -859,14 +963,25 @@ export function initSlotEditor(): void {
       // drop the cursor affordance immediately so the user sees Space is off.
       if (!pan) setPanCursor(false);
     }
+    if (e.key === "Alt") {
+      altHeld = false;
+    }
   });
 
-  // Drop the spaceHeld latch if the tab loses focus mid-hold.
+  // Track Alt held — temporarily disables snap mid-drag. We track it
+  // globally (not only over the canvas) so it stays sticky across browser
+  // chrome enter/exit; it's released on keyup or blur.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Alt") altHeld = true;
+  });
+
+  // Drop latched modifier state if the tab loses focus mid-hold.
   window.addEventListener("blur", () => {
     if (spaceHeld) {
       spaceHeld = false;
       if (!pan) setPanCursor(false);
     }
+    altHeld = false;
   });
 
   // Click outside the popover closes it; click outside canvas/sidebar deselects.

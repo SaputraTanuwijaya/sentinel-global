@@ -11,6 +11,7 @@ import { MissionService } from "../../services/MissionService";
 import { DresscodeService } from "../../services/DresscodeService";
 import { PricingService } from "../../services/PricingService";
 import { VehicleService } from "../../services/VehicleService";
+import { FormationService } from "../../services/FormationService";
 import { requireUserApi, userContext } from "../../core/auth";
 import type { MissionState } from "./models/Mission";
 
@@ -24,10 +25,11 @@ export const orderRouter = new Elysia()
   // Consumed by the wizard's ledger + checkout summary so client-side pricing
   // tracks server-side edits. Cents-as-integer to match server math.
   .get("/api/catalog/manifest.json", async ({ set }) => {
-    const [rules, dresscodes, vehicles] = await Promise.all([
+    const [rules, dresscodes, vehicles, formationDefaults] = await Promise.all([
       PricingService.getAll(),
       DresscodeService.listActive(),
       VehicleService.listActive(),
+      FormationService.activeDefaultsByTier(),
     ]);
     set.headers["cache-control"] = "no-store";
 
@@ -51,6 +53,36 @@ export const orderRouter = new Elysia()
         label: d.label,
         description: d.description,
       })),
+      // Formations: keyed by tier so SceneManager can do
+      // `defaults[tier]` directly. Tiers with no admin-chosen default are
+      // absent from the map; SceneManager falls back to its built-in
+      // TIER_CONFIG in that case. Slots carry x/z/role so the wizard can
+      // render holographic markers + filter the garage drawer.
+      formations: {
+        defaults: Object.fromEntries(
+          Array.from(formationDefaults.entries()).map(([tier, f]) => [
+            tier,
+            {
+              id: f.id,
+              label: f.label,
+              canvas_width: f.canvas_width,
+              canvas_depth: f.canvas_depth,
+              slots: f.slots.map((s) => ({
+                id: s.id,
+                label: s.label,
+                x: s.x,
+                z: s.z,
+                rotation_deg: s.rotation_deg,
+                // Primary role drives the holographic marker colour;
+                // allowed_categories drives garage-drawer vehicle filtering.
+                role: s.allowed_categories[0] ?? "LEAD",
+                allowed_categories: s.allowed_categories,
+                order_index: s.order_index,
+              })),
+            },
+          ]),
+        ),
+      },
       vehicles: vehicles.map((v) => ({
         id: v.id,
         label: v.label,

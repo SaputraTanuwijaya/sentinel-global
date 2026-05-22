@@ -29445,6 +29445,9 @@ var PATCH_DEBOUNCE_MS = 250;
 var ZOOM_STEP = 1.15;
 var MIN_ZOOM = 1;
 var MAX_ZOOM = 20;
+var SNAP_SIZES = [0, 0.5, 1, 2, 5];
+var SNAP_DEFAULT_INDEX = 2;
+var SNAP_STORAGE_KEY = "sentinel.slotEditor.snapIndex";
 function initSlotEditor() {
   const svg = document.getElementById("slot-editor-svg");
   const canvas = document.getElementById("slot-editor-canvas");
@@ -29564,6 +29567,54 @@ function initSlotEditor() {
     zoomAtSvgPoint({ x: cx, y: cy }, 1 / ZOOM_STEP);
   });
   zoomFit?.addEventListener("click", fitViewport);
+  let altHeld = false;
+  let snapIndex = loadSnapIndex();
+  function loadSnapIndex() {
+    try {
+      const raw = localStorage.getItem(SNAP_STORAGE_KEY);
+      if (raw === null)
+        return SNAP_DEFAULT_INDEX;
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 0 && n < SNAP_SIZES.length)
+        return n;
+    } catch {}
+    return SNAP_DEFAULT_INDEX;
+  }
+  function saveSnapIndex() {
+    try {
+      localStorage.setItem(SNAP_STORAGE_KEY, String(snapIndex));
+    } catch {}
+  }
+  function currentSnapSize() {
+    if (altHeld)
+      return 0;
+    return SNAP_SIZES[snapIndex] ?? 0;
+  }
+  function snap(n) {
+    const s = currentSnapSize();
+    if (s <= 0)
+      return round1(n);
+    return Math.round(n / s) * s;
+  }
+  const snapToggle = document.getElementById("snap-toggle");
+  const snapReadout = document.getElementById("snap-readout");
+  const snapIndicator = document.getElementById("snap-indicator");
+  function paintSnapUi() {
+    const s = SNAP_SIZES[snapIndex] ?? 0;
+    if (snapReadout) {
+      snapReadout.textContent = s <= 0 ? "off" : `${s}m`;
+    }
+    if (snapIndicator) {
+      snapIndicator.classList.toggle("bg-sentinel-accent", s > 0);
+      snapIndicator.classList.toggle("bg-gray-600", s <= 0);
+    }
+  }
+  paintSnapUi();
+  snapToggle?.addEventListener("click", () => {
+    snapIndex = (snapIndex + 1) % SNAP_SIZES.length;
+    saveSnapIndex();
+    paintSnapUi();
+  });
   let spaceHeld = false;
   let pan = null;
   let lastPanEnd = 0;
@@ -29590,8 +29641,8 @@ function initSlotEditor() {
     return { x: local.x, y: local.y };
   }
   const svgToDb = (svgX, svgY) => ({
-    x: round1(svgX),
-    z: round1(depth - svgY)
+    x: snap(svgX),
+    z: snap(depth - svgY)
   });
   const dbToTransform = (x, z, rot) => `translate(${x} ${depth - z}) rotate(${rot})`;
   function round1(n) {
@@ -29792,8 +29843,8 @@ function initSlotEditor() {
     drag.moved = true;
     const a = screenToSvg(drag.startClient.x, drag.startClient.y);
     const b = screenToSvg(e.clientX, e.clientY);
-    const newX = round1(drag.startDb.x + (b.x - a.x));
-    const newZ = round1(drag.startDb.z - (b.y - a.y));
+    const newX = snap(drag.startDb.x + (b.x - a.x));
+    const newZ = snap(drag.startDb.z - (b.y - a.y));
     setVisualTransform(drag.g, newX, newZ, drag.rotation);
     drag.g.setAttribute("data-x", String(newX));
     drag.g.setAttribute("data-z", String(newZ));
@@ -29936,6 +29987,30 @@ function initSlotEditor() {
   bindDetailField(detailX, "x", (s) => s === "" || Number.isNaN(Number(s)) ? undefined : Number(s));
   bindDetailField(detailZ, "z", (s) => s === "" || Number.isNaN(Number(s)) ? undefined : Number(s));
   bindDetailField(detailRotation, "rotation_deg", (s) => s === "" || Number.isNaN(Number(s)) ? undefined : Number(s));
+  function snapOnCommit(el, fieldName) {
+    el.addEventListener("change", () => {
+      if (!selectedId)
+        return;
+      const raw = Number(el.value);
+      if (!Number.isFinite(raw))
+        return;
+      const snapped = snap(raw);
+      if (snapped === raw)
+        return;
+      el.value = String(snapped);
+      const g = findSlotGroup(selectedId);
+      if (g) {
+        const x = fieldName === "x" ? snapped : Number(g.getAttribute("data-x") ?? 0);
+        const z = fieldName === "z" ? snapped : Number(g.getAttribute("data-z") ?? 0);
+        const rot = Number(g.getAttribute("data-rotation") ?? 0);
+        setVisualTransform(g, x, z, rot);
+        g.setAttribute(`data-${fieldName}`, String(snapped));
+      }
+      queuePatch(selectedId, { [fieldName]: snapped });
+    });
+  }
+  snapOnCommit(detailX, "x");
+  snapOnCommit(detailZ, "z");
   detailRoles.querySelectorAll("input[name=detail-role]").forEach((cb) => {
     cb.addEventListener("change", () => {
       if (!selectedId)
@@ -30040,6 +30115,13 @@ function initSlotEditor() {
       if (!pan)
         setPanCursor(false);
     }
+    if (e.key === "Alt") {
+      altHeld = false;
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Alt")
+      altHeld = true;
   });
   window.addEventListener("blur", () => {
     if (spaceHeld) {
@@ -30047,6 +30129,7 @@ function initSlotEditor() {
       if (!pan)
         setPanCursor(false);
     }
+    altHeld = false;
   });
   document.addEventListener("pointerdown", (e) => {
     const t = e.target;

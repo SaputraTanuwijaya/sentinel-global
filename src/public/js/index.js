@@ -30651,6 +30651,14 @@ class SceneManager {
       { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
     ]
   };
+  ROLE_COLOR_HEX = {
+    PRINCIPAL: 15381256,
+    LEAD: 9741240,
+    REAR: 3900150,
+    SWEEPER: 440020,
+    CAT: 15680580,
+    ECM: 11032055
+  };
   cameraTargetPos = new Vector3(0, 8, 12);
   cameraLookAt = new Vector3(0, 0, 0);
   motorcadeSpotLights = [];
@@ -31014,10 +31022,6 @@ class SceneManager {
     this.principalInstances.forEach((p) => {
       p.visible = false;
     });
-    this.cameraTargetPos.set(25, 8, 0);
-    this.cameraLookAt.set(0, 0, 0);
-    this.camera.position.copy(this.cameraTargetPos);
-    this.camera.lookAt(this.cameraLookAt);
     this.motorcadeSpotLights.forEach((light) => {
       this.scene.remove(light);
       if (light.target)
@@ -31030,7 +31034,32 @@ class SceneManager {
     this.motorcadeLightPools = [];
     this.slotGroup.clear();
     this.scene.add(this.slotGroup);
-    const config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    const fromManifest = window.__FORMATIONS__?.[tier];
+    let config;
+    if (fromManifest && Array.isArray(fromManifest.slots) && fromManifest.slots.length > 0) {
+      config = fromManifest.slots.map((s, idx) => {
+        const role = s.role ?? (Array.isArray(s.allowed_categories) ? s.allowed_categories[0] : "LEAD");
+        return {
+          id: idx,
+          role,
+          x: Number(s.x) || 0,
+          z: Number(s.z) || 0,
+          color: this.ROLE_COLOR_HEX[role] ?? 8947848,
+          allowed_categories: Array.isArray(s.allowed_categories) ? s.allowed_categories : [role]
+        };
+      });
+    } else {
+      config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
+    }
+    const centroidZ = config.length > 0 ? config.reduce((acc, s) => acc + (Number(s.z) || 0), 0) / config.length : 0;
+    this.cameraTargetPos.set(25, 8, centroidZ);
+    this.cameraLookAt.set(0, 0, centroidZ);
+    this.camera.position.copy(this.cameraTargetPos);
+    this.camera.lookAt(this.cameraLookAt);
+    if (this.controls) {
+      this.controls.target.set(0, 0, centroidZ);
+      this.controls.update();
+    }
     this.loadedVehicles.forEach((v) => {
       v.visible = true;
       v.traverse((child) => {

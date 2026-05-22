@@ -5,6 +5,7 @@
 //   - `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`
 //   - `INSERT OR IGNORE` for seed rows (admin edits won't be clobbered)
 
+import { randomUUID } from "crypto";
 import { db } from "../src/core/db";
 
 const TABLES: { name: string; sql: string }[] = [
@@ -559,6 +560,133 @@ async function run() {
     });
   }
   console.log(`   ✓ ${PRICING.length} pricing rules (or already present)`);
+
+  // ── Idempotent upgrade: formations.is_default + partial unique index ────
+  // The `status` column is lifecycle (active/archived). Selection-for-wizard
+  // is a separate concern — exactly one formation per tier is "the default".
+  // Partial unique index gives us DB-level mutual exclusion without juggling
+  // app-level locks. setDefault() in FormationService runs the swap as a
+  // single libsql batch so the unique constraint never sees a transient
+  // duplicate.
+  console.log("→ upgrading formations.is_default (if needed)");
+  const fCols = await db.execute("PRAGMA table_info(formations)");
+  const hasIsDefault = fCols.rows.some(
+    (r: any) => (r.name ?? r[1]) === "is_default",
+  );
+  if (!hasIsDefault) {
+    await db.execute(
+      "ALTER TABLE formations ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0",
+    );
+    console.log("   ✓ added is_default column");
+  } else {
+    console.log("   ✓ is_default already present");
+  }
+  await db.execute(
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_default_per_tier
+       ON formations(tier_id)
+       WHERE is_default = 1 AND status = 'active'`,
+  );
+
+  // ── Seed default formations ─────────────────────────────────────────────
+  // Mirrors the legacy `SceneManager.TIER_CONFIG` so guests get the same
+  // motorcade layout the v1 hardcoded build had — but now editable in admin
+  // and selectable per tier. Slot z values are POSITIVE so the SVG card
+  // (viewBox `0 0 w d`, cy=d-z) renders them inside the box; SceneManager
+  // re-centres the camera on the slot centroid so the in-3D framing also
+  // works regardless of slot range.
+  type SeedSlot = {
+    label: string;
+    x: number;
+    z: number;
+    rotation_deg: number;
+    allowed_categories: string[];
+    order_index: number;
+  };
+  type SeedFormation = {
+    id: string;
+    label: string;
+    description: string;
+    tier_id: "Vanguard" | "Sentinel" | "Praetorian";
+    canvas_width: number;
+    canvas_depth: number;
+    slots: SeedSlot[];
+  };
+  const STANDARD_SLOTS: SeedSlot[] = [
+    { label: "Sweeper",   x: 0, z: 45, rotation_deg: 0, allowed_categories: ["SWEEPER"],   order_index: 0 },
+    { label: "Lead",      x: 0, z: 35, rotation_deg: 0, allowed_categories: ["LEAD"],      order_index: 1 },
+    { label: "Principal", x: 0, z: 25, rotation_deg: 0, allowed_categories: ["PRINCIPAL"], order_index: 2 },
+    { label: "CAT",       x: 0, z: 15, rotation_deg: 0, allowed_categories: ["CAT"],       order_index: 3 },
+    { label: "ECM",       x: 0, z:  5, rotation_deg: 0, allowed_categories: ["ECM"],       order_index: 4 },
+  ];
+  const SEED_FORMATIONS: SeedFormation[] = (
+    ["Vanguard", "Sentinel", "Praetorian"] as const
+  ).map((t) => ({
+    id: `default_${t.toLowerCase()}`,
+    label: `${t} Default`,
+    description: `Standard ${t} motorcade layout. Edit slots or create a replacement and mark it default for this tier.`,
+    tier_id: t,
+    canvas_width: 20,
+    canvas_depth: 50,
+    slots: STANDARD_SLOTS,
+  }));
+
+  console.log("→ seeding default formations");
+  // INSERT OR IGNORE keeps any admin-created formation with the same id;
+  // slots inherit the same "skip if formation already had any" check so we
+  // don't re-add duplicates on re-run.
+  for (const f of SEED_FORMATIONS) {
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO formations
+            (id, label, description, tier_id, canvas_width, canvas_depth,
+             status, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP)`,
+      args: [f.id, f.label, f.description, f.tier_id, f.canvas_width, f.canvas_depth],
+    });
+    const slotCountRow = await db.execute({
+      sql: "SELECT COUNT(*) AS n FROM slots WHERE formation_id = ?",
+      args: [f.id],
+    });
+    const existingSlots = Number((slotCountRow.rows[0] as any).n ?? 0);
+    if (existingSlots === 0) {
+      for (const s of f.slots) {
+        await db.execute({
+          sql: `INSERT INTO slots
+                (id, formation_id, label, x, z, rotation_deg,
+                 allowed_categories, order_index)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            randomUUID(),
+            f.id,
+            s.label,
+            s.x,
+            s.z,
+            s.rotation_deg,
+            JSON.stringify(s.allowed_categories),
+            s.order_index,
+          ],
+        });
+      }
+    }
+  }
+  console.log(`   ✓ ${SEED_FORMATIONS.length} default formations (+ slots if missing)`);
+
+  // Mark each tier's seeded default as is_default ONLY if no other active
+  // formation already holds that flag — admin choices win over the seed.
+  for (const f of SEED_FORMATIONS) {
+    const existing = await db.execute({
+      sql: `SELECT id FROM formations
+            WHERE tier_id = ? AND is_default = 1 AND status = 'active'
+            LIMIT 1`,
+      args: [f.tier_id],
+    });
+    if (existing.rows.length === 0) {
+      await db.execute({
+        sql: "UPDATE formations SET is_default = 1 WHERE id = ?",
+        args: [f.id],
+      });
+    }
+  }
+  console.log("   ✓ default-per-tier flag applied where unclaimed");
 
   // Summary counts
   const counts = await Promise.all([

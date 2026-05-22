@@ -1,6 +1,7 @@
 import { Html } from "@elysiajs/html";
-import type { Formation } from "../../services/FormationService";
+import type { Formation, Slot } from "../../services/FormationService";
 import { FORMATION_TIERS } from "../../services/FormationService";
+import { ROLE_COLOR } from "./SlotEditor";
 
 const STATUS_CHIP: Record<string, string> = {
   active: "bg-green-500/20 text-green-300",
@@ -17,20 +18,53 @@ const cardId = (id: string) => `formation-card-${id}`;
 
 export type Flash = { kind: "success" | "error"; message: string };
 
+// Card-mini SVG slot dot. Same `cy = depth - z` convention as SlotEditor
+// so the miniature lines up with what the admin sees inside the editor.
+const SlotDot = ({
+  slot,
+  canvas,
+}: {
+  slot: Slot;
+  canvas: { width: number; depth: number };
+}) => {
+  const primary = slot.allowed_categories[0];
+  const fill = primary ? ROLE_COLOR[primary] : "#94a3b8";
+  const cy = canvas.depth - slot.z;
+  // Dot radius scales with the larger canvas dimension so a long thin
+  // canvas doesn't render invisibly small dots.
+  const r = Math.max(canvas.width, canvas.depth) * 0.025;
+  return (
+    <circle
+      cx={slot.x}
+      cy={cy}
+      r={r}
+      fill={fill}
+      stroke="rgba(0,0,0,0.6)"
+      stroke-width={r * 0.15}
+    />
+  );
+};
+
 export const FormationCard = ({
   f,
   slotCount,
+  slots,
 }: {
   f: Formation;
   slotCount: number;
+  /** Optional. When omitted the card renders the canvas-only miniature —
+   *  same behaviour the legacy card had. Pass the real slots from the
+   *  grid handler for the dots to show. */
+  slots?: Slot[];
 }) => {
   const isArchived = f.status === "archived";
+  const canDefault = !!f.tier_id && !isArchived;
   return (
     <div
       id={cardId(f.id)}
-      class={`bg-zinc-950 border border-white/10 rounded overflow-hidden flex flex-col ${
-        isArchived ? "opacity-60" : ""
-      }`}
+      class={`bg-zinc-950 border ${
+        f.is_default && !isArchived ? "border-amber-500/40" : "border-white/10"
+      } rounded overflow-hidden flex flex-col ${isArchived ? "opacity-60" : ""}`}
     >
       <div class="aspect-[3/2] bg-gradient-to-br from-zinc-900 to-black border-b border-white/10 relative">
         <svg
@@ -56,6 +90,12 @@ export const FormationCard = ({
             stroke-width={Math.max(f.canvas_width, f.canvas_depth) * 0.002}
             stroke-dasharray={`${f.canvas_depth * 0.02},${f.canvas_depth * 0.02}`}
           />
+          {(slots ?? []).map((s) => (
+            <SlotDot
+              slot={s}
+              canvas={{ width: f.canvas_width, depth: f.canvas_depth }}
+            />
+          ))}
         </svg>
         <div class="absolute top-2 left-3 text-[9px] tracking-widest uppercase text-gray-600">
           {f.canvas_width.toFixed(0)} × {f.canvas_depth.toFixed(0)} m
@@ -73,8 +113,10 @@ export const FormationCard = ({
             </div>
           </div>
           <div class="flex flex-col items-end gap-1">
+            {/* Lifecycle status — separate from "default in wizard". */}
             <span
               class={`px-2 py-1 ${STATUS_CHIP[f.status]} text-[10px] rounded tracking-widest uppercase`}
+              title="Lifecycle. Archived formations disappear from the wizard regardless of default."
             >
               {f.status}
             </span>
@@ -90,10 +132,40 @@ export const FormationCard = ({
         {f.description && (
           <p class="text-gray-400 text-xs line-clamp-3">{f.description}</p>
         )}
+
+        {/* Default-per-tier row: the only thing that decides what guests
+            see. Visually separate from the lifecycle chip above so the
+            two concepts don't bleed together. */}
+        <div class="flex items-center justify-between text-[10px] tracking-widest uppercase border-t border-white/5 pt-3">
+          {f.is_default && !isArchived ? (
+            <span
+              class="px-2 py-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 rounded"
+              title="The wizard renders this formation for this tier."
+            >
+              ● Default for {f.tier_id}
+            </span>
+          ) : canDefault ? (
+            <button
+              type="button"
+              class="text-gray-400 hover:text-amber-300 cursor-pointer"
+              hx-patch={`/admin/formations/${f.id}/default`}
+              hx-target={`#${cardId(f.id)}`}
+              hx-swap="outerHTML"
+              title={`Make this the formation the wizard renders for ${f.tier_id}.`}
+            >
+              Set as default
+            </button>
+          ) : (
+            <span class="text-gray-600 normal-case tracking-normal italic">
+              {isArchived
+                ? "Reactivate to use in the wizard."
+                : "Assign a tier to use this in the wizard."}
+            </span>
+          )}
+        </div>
+
         <div class="mt-auto flex items-center justify-between text-[10px] tracking-widest uppercase">
-          <div class="text-gray-500">
-            {f.tier_id ?? "Unlinked"}
-          </div>
+          <div class="text-gray-500">{f.tier_id ?? "Unlinked"}</div>
           <div class="flex items-center gap-3">
             <a
               href={`/admin/formations/${f.id}`}
@@ -118,7 +190,11 @@ export const FormationCard = ({
                 hx-delete={`/admin/formations/${f.id}`}
                 hx-target={`#${cardId(f.id)}`}
                 hx-swap="outerHTML"
-                hx-confirm="Archive this formation? It disappears from the wizard. Slots are preserved for history."
+                hx-confirm={
+                  f.is_default
+                    ? "Archive this DEFAULT formation? Wizard will fall back to built-in layout for this tier until you pick a new default."
+                    : "Archive this formation? It disappears from the wizard. Slots are preserved for history."
+                }
               >
                 Archive
               </button>
@@ -133,9 +209,14 @@ export const FormationCard = ({
 export const FormationsGrid = ({
   formations,
   slotCounts,
+  slotsByFormation,
 }: {
   formations: Formation[];
   slotCounts: Map<string, number>;
+  /** Optional bulk slot map keyed by formation id. Passed from the GET
+   *  /admin/formations handler so each card miniature can draw its dots
+   *  without an N+1 round-trip. */
+  slotsByFormation?: Map<string, Slot[]>;
 }) => {
   return (
     <div class="max-w-6xl">
@@ -171,7 +252,11 @@ export const FormationsGrid = ({
       ) : (
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {formations.map((f) => (
-            <FormationCard f={f} slotCount={slotCounts.get(f.id) ?? 0} />
+            <FormationCard
+              f={f}
+              slotCount={slotCounts.get(f.id) ?? 0}
+              slots={slotsByFormation?.get(f.id) ?? []}
+            />
           ))}
         </div>
       )}

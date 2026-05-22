@@ -387,7 +387,7 @@ export const SlotEditorPage = ({
         <div class="text-[10px] tracking-widest uppercase text-gray-500 text-right leading-relaxed">
           Click empty to add · Drag to move · R to rotate · Del to delete
           <br />
-          Wheel to zoom · Middle/right-drag (or Space + drag) to pan · 0 to fit
+          Wheel zoom · Middle/right (or Space) drag = pan · 0 = fit · Alt = no snap
         </div>
       </header>
 
@@ -414,7 +414,7 @@ export const SlotEditorPage = ({
             <SlotLayer formation={formation} />
           </svg>
 
-          {/* Zoom controls (positioned over the canvas, bottom-right) */}
+          {/* Zoom + snap controls (positioned over the canvas, bottom-right) */}
           <div
             id="slot-editor-zoom-controls"
             class="absolute bottom-3 right-3 z-20 flex items-center gap-1 bg-black/70 border border-white/15 rounded backdrop-blur-sm text-xs"
@@ -448,6 +448,21 @@ export const SlotEditorPage = ({
               class="px-2 h-8 flex items-center justify-center text-[10px] tracking-widest uppercase text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border-l border-white/15"
             >
               Fit
+            </button>
+            <button
+              type="button"
+              id="snap-toggle"
+              title="Snap to grid — click to cycle off / 0.5 / 1 / 2 / 5 m. Hold Alt while dragging to disable."
+              class="px-2 h-8 flex items-center gap-1 text-[10px] tracking-widest uppercase hover:bg-white/10 transition-colors cursor-pointer border-l border-white/15"
+            >
+              <span
+                id="snap-indicator"
+                class="w-1.5 h-1.5 rounded-full bg-gray-600"
+              ></span>
+              <span class="text-gray-400">Snap</span>
+              <span id="snap-readout" class="text-sentinel-accent tabular-nums">
+                1m
+              </span>
             </button>
           </div>
 
