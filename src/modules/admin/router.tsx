@@ -1082,24 +1082,113 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
     { beforeHandle: requireAdmin },
   )
 
+  // One-click activation from the slot editor — sets the tier (if it
+  // wasn't already) and marks the formation default for that tier in one
+  // round-trip. The grid card's "Set as default" + the editor's "Activate"
+  // banner both hit this; the editor banner uses the wider hx-vals body to
+  // pass the chosen tier when the formation is tier-less.
+  .post(
+    "/formations/:id/activate",
+    async ({ params, body, set }) => {
+      try {
+        const existing = await FormationService.get(params.id);
+        if (!existing) {
+          set.status = 404;
+          return <AdminError message={`No formation with id ${params.id}.`} />;
+        }
+        const tier =
+          body.tier_id !== undefined && body.tier_id !== ""
+            ? String(body.tier_id)
+            : existing.tier_id;
+        if (!tier) {
+          set.status = 400;
+          return (
+            <AdminError message="Pick a tier before activating." />
+          );
+        }
+        // Assign tier if it changed; setDefault then enforces partial-unique
+        // index by clearing any sibling default in the same libsql batch.
+        if (tier !== existing.tier_id) {
+          await FormationService.update(params.id, { tier_id: tier });
+        }
+        const fresh = await FormationService.setDefault(params.id);
+        // Trigger a full refresh so the editor's settings panel + the
+        // activation banner both reflect the new state without us having to
+        // OOB-swap multiple fragments. The wizard read goes through the
+        // catalog cache which setDefault already invalidated.
+        set.headers["HX-Refresh"] = "true";
+        return "";
+      } catch (err: any) {
+        console.error(
+          "/// FORMATION ACTIVATE FAILED ///",
+          err?.message ?? err,
+        );
+        set.status = 400;
+        return (
+          <AdminError message={err?.message ?? "Could not activate."} />
+        );
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        tier_id: t.Optional(t.String()),
+      }),
+      beforeHandle: requireAdmin,
+    },
+  )
+
   .patch(
     "/formations/:id/default",
     async ({ params, set }) => {
       try {
+        const target = await FormationService.get(params.id);
+        if (!target) {
+          set.status = 404;
+          return <AdminError message={`No formation with id ${params.id}.`} />;
+        }
+        // Look up the sibling that's about to be unflagged BEFORE the
+        // swap so we have its id to refresh in the response. setDefault
+        // is mutually-exclusive at the DB level, so after it runs that
+        // sibling has is_default=0 and re-fetching gives us the new card
+        // state to OOB-swap into the grid.
+        const previousId = target.tier_id
+          ? (await FormationService.currentDefaultForTier(
+              target.tier_id,
+              target.id,
+            ))?.id ?? null
+          : null;
+
         const f = await FormationService.setDefault(params.id);
         const counts = await FormationService.slotCounts();
         const slots = await FormationService.listSlots(f.id);
-        // Mutual exclusion is DB-enforced, but we only swap the row that
-        // was clicked. The previous default's chip will stay stale until
-        // the admin refreshes — acceptable trade-off vs. broadcasting an
-        // OOB swap for every sibling. If it becomes annoying, return an
-        // OOB <FormationCard> fragment for the sibling too.
+
+        // If a sibling lost its default flag, send its refreshed card as
+        // an out-of-band swap so the grid flips both cards in the same
+        // response — admin no longer sees "two cards marked default."
+        const previous = previousId
+          ? await FormationService.get(previousId)
+          : null;
+        const previousSlots = previousId
+          ? await FormationService.listSlots(previousId)
+          : [];
+
         return (
-          <FormationCard
-            f={f}
-            slotCount={counts.get(f.id) ?? 0}
-            slots={slots}
-          />
+          <>
+            <FormationCard
+              f={f}
+              slotCount={counts.get(f.id) ?? 0}
+              slots={slots}
+            />
+            {previous && (
+              <FormationCard
+                f={previous}
+                slotCount={counts.get(previous.id) ?? 0}
+                slots={previousSlots}
+                oob
+              />
+            )}
+          </>
         );
       } catch (err: any) {
         console.error("/// FORMATION SETDEFAULT FAILED ///", err?.message ?? err);

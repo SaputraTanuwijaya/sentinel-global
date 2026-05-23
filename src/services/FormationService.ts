@@ -482,6 +482,26 @@ export class FormationService {
     return this.update(id, { status: "active" });
   }
 
+  /** Find the formation currently marked default for a tier (or null if
+   *  none). Excludes `excludeId` so the caller can ask "who would I be
+   *  replacing if I activated this formation?" without confusing the
+   *  target with itself. Returned formation may have any status; the
+   *  partial-unique index only constrains active rows. */
+  static async currentDefaultForTier(
+    tier: string,
+    excludeId?: string,
+  ): Promise<Formation | null> {
+    const r = await db.execute({
+      sql: excludeId
+        ? `SELECT * FROM formations
+           WHERE tier_id = ? AND is_default = 1 AND id != ? LIMIT 1`
+        : `SELECT * FROM formations
+           WHERE tier_id = ? AND is_default = 1 LIMIT 1`,
+      args: excludeId ? [tier, excludeId] : [tier],
+    });
+    return r.rows[0] ? toFormation(r.rows[0]) : null;
+  }
+
   /** Mark `id` as the default for its tier and clear any sibling default
    *  in a single batch so the partial unique index never sees a transient
    *  duplicate. Throws if the formation is archived or tier-less — both

@@ -49,6 +49,7 @@ export const FormationCard = ({
   f,
   slotCount,
   slots,
+  oob,
 }: {
   f: Formation;
   slotCount: number;
@@ -56,12 +57,18 @@ export const FormationCard = ({
    *  same behaviour the legacy card had. Pass the real slots from the
    *  grid handler for the dots to show. */
   slots?: Slot[];
+  /** When true, render this card as an htmx out-of-band swap so the route
+   *  can return multiple cards in one response (e.g. when "Set as default"
+   *  also needs to refresh the previous default's card to clear its
+   *  amber chip). The card's id-attr is the swap target. */
+  oob?: boolean;
 }) => {
   const isArchived = f.status === "archived";
   const canDefault = !!f.tier_id && !isArchived;
   return (
     <div
       id={cardId(f.id)}
+      hx-swap-oob={oob ? "outerHTML" : undefined}
       class={`bg-zinc-950 border ${
         f.is_default && !isArchived ? "border-amber-500/40" : "border-white/10"
       } rounded overflow-hidden flex flex-col ${isArchived ? "opacity-60" : ""}`}

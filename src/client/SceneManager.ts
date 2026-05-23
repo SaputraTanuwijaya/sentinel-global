@@ -55,25 +55,25 @@ export class SceneManager {
   // in `scripts/migrate-admin.ts` mirrors this and admins can diverge.
   private readonly TIER_CONFIG: Record<string, any[]> = {
     Vanguard: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff }, // Cyan
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 }, // Gray
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 }, // Gold
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 }, // Red
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff }, // Blue
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff }, // Cyan
+      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 }, // Gray
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 }, // Gold
+      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 }, // Red
+      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff }, // Blue
     ],
     Sentinel: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff },
+      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 },
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 },
+      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 },
+      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff },
     ],
     Praetorian: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 0x00ffff },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 0x888888 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 0xff4444 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 0x4444ff },
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff },
+      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 },
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 },
+      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 },
+      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff },
     ],
   };
 
@@ -93,6 +93,12 @@ export class SceneManager {
   // Camera Lerping
   private cameraTargetPos: THREE.Vector3 = new THREE.Vector3(0, 8, 12);
   private cameraLookAt: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
+  // Centroid of the currently-loaded formation's slots, along the +Z axis.
+  // Stored so focusOnSlot / resetMotorcadeCamera frame the formation
+  // correctly regardless of where the admin placed slots in the canvas
+  // (seeded defaults sit at z=5..45, old TIER_CONFIG centred on 0). 0 is
+  // the safe pre-init default that mirrors the previous hardcoded behaviour.
+  private formationCentroidZ: number = 0;
   private motorcadeSpotLights: THREE.SpotLight[] = [];
   private motorcadeBeams: THREE.Mesh[] = [];
   private motorcadeLightPools: THREE.Mesh[] = [];
@@ -686,21 +692,33 @@ export class SceneManager {
       config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
     }
 
-    // Centre the camera on the slot centroid so admin-defined formations
-    // (which can sit anywhere in their canvas) frame the same way the
-    // built-in TIER_CONFIG (centred on z=0) does. x stays at 25 for the
-    // side-view; lookAt y is 0 so we look at ground level.
+    // Normalise slot positions so the formation always renders centred on
+    // world-origin (z=0), regardless of where the admin authored slots in
+    // the canvas. The DB stores them with positive z (the slot editor's
+    // viewBox is `0..depth`, so negative z would render off-canvas). At
+    // render time we subtract the centroid so the rendered group sits on
+    // (0,0,0) — same framing the old hardcoded TIER_CONFIG provided.
+    //
+    // Camera target stays at the world origin, which keeps the formation
+    // visually centred against the static ground grid (the user reported
+    // it drifting forward when we tracked the centroid instead).
     const centroidZ =
       config.length > 0
         ? config.reduce((acc: number, s: any) => acc + (Number(s.z) || 0), 0) /
           config.length
         : 0;
-    this.cameraTargetPos.set(25, 8, centroidZ);
-    this.cameraLookAt.set(0, 0, centroidZ);
+    if (centroidZ !== 0) {
+      config = config.map((s: any) => ({ ...s, z: Number(s.z) - centroidZ }));
+    }
+    // Formation now renders around (0,0,0); cached for any code path that
+    // still consults this field (focus/reset are now camera-no-ops).
+    this.formationCentroidZ = 0;
+    this.cameraTargetPos.set(25, 8, 0);
+    this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
     if (this.controls) {
-      this.controls.target.set(0, 0, centroidZ);
+      this.controls.target.set(0, 0, 0);
       this.controls.update();
     }
 
@@ -771,10 +789,12 @@ export class SceneManager {
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot) return;
 
-    // Close up side angle
-    this.cameraTargetPos.set(12, 4, slot.position.z);
-    this.cameraLookAt.set(0, 0, slot.position.z);
-    this.isTransitioning = true;
+    // No camera movement on slot click — the previous "pan + dive" felt
+    // like the formation itself was jumping (parallax against the static
+    // ground grid). The clicked slot is identified by brightening its
+    // spotlight + dimming the others, and the orbit controls are locked
+    // so the user can't accidentally drag the view while picking a
+    // vehicle. The camera resumes where the user left it on close.
 
     // DISABLE FREE MOVEMENT during vehicle selection
     if (this.controls) this.controls.enabled = false;
@@ -796,11 +816,10 @@ export class SceneManager {
   }
 
   public resetMotorcadeCamera() {
-    this.cameraTargetPos.set(25, 8, 0);
-    this.cameraLookAt.set(0, 0, 0);
-    this.isTransitioning = true;
+    // Pair with focusOnSlot's no-op: don't move the camera back either.
+    // The camera stays wherever the user (or initMotorcadeMode) left it.
+    // We only re-enable orbit controls so the user can keep navigating.
 
-    // RE-ENABLE FREE MOVEMENT when drawer is closed
     if (this.controls) {
       this.controls.enabled = true;
       this.controls.update();
@@ -828,7 +847,18 @@ export class SceneManager {
 
     const slot = new THREE.LineSegments(edges, material);
     slot.position.set(data.x, 0, data.z);
-    slot.userData = { id: data.id, role: data.role, type: "slot" };
+    // `allowed_categories` comes from the formation's slot row when the
+    // manifest is present; for the hardcoded TIER_CONFIG fallback it's
+    // [role]. Stored on userData so the click handler can pass it to the
+    // garage drawer without re-deriving from the formation lookup.
+    slot.userData = {
+      id: data.id,
+      role: data.role,
+      allowed_categories: Array.isArray(data.allowed_categories)
+        ? data.allowed_categories
+        : [data.role],
+      type: "slot",
+    };
 
     // Anchor
     const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 2);
@@ -867,7 +897,16 @@ export class SceneManager {
 
         document.body.dispatchEvent(
           new CustomEvent("sentinel-garage-open", {
-            detail: { slotId: userData.id, role: userData.role },
+            detail: {
+              slotId: userData.id,
+              role: userData.role,
+              // The slot's full role set — used by Motorcade.tsx to filter
+              // the vehicle drawer. Falls back to [role] for older paths
+              // that haven't been migrated yet.
+              allowed_categories: Array.isArray(userData.allowed_categories)
+                ? userData.allowed_categories
+                : [userData.role],
+            },
           }),
         );
       }

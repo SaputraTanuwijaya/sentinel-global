@@ -30630,25 +30630,25 @@ class SceneManager {
   resizeTimer = null;
   TIER_CONFIG = {
     Vanguard: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
+      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
+      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
     ],
     Sentinel: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
+      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
+      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
     ],
     Praetorian: [
-      { id: 0, role: "SWEEPER", x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", x: 0, z: -20, color: 4474111 }
+      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
+      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
+      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
+      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
+      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
     ]
   };
   ROLE_COLOR_HEX = {
@@ -30661,6 +30661,7 @@ class SceneManager {
   };
   cameraTargetPos = new Vector3(0, 8, 12);
   cameraLookAt = new Vector3(0, 0, 0);
+  formationCentroidZ = 0;
   motorcadeSpotLights = [];
   motorcadeBeams = [];
   motorcadeLightPools = [];
@@ -31052,12 +31053,16 @@ class SceneManager {
       config = this.TIER_CONFIG[tier] || this.TIER_CONFIG["Vanguard"];
     }
     const centroidZ = config.length > 0 ? config.reduce((acc, s) => acc + (Number(s.z) || 0), 0) / config.length : 0;
-    this.cameraTargetPos.set(25, 8, centroidZ);
-    this.cameraLookAt.set(0, 0, centroidZ);
+    if (centroidZ !== 0) {
+      config = config.map((s) => ({ ...s, z: Number(s.z) - centroidZ }));
+    }
+    this.formationCentroidZ = 0;
+    this.cameraTargetPos.set(25, 8, 0);
+    this.cameraLookAt.set(0, 0, 0);
     this.camera.position.copy(this.cameraTargetPos);
     this.camera.lookAt(this.cameraLookAt);
     if (this.controls) {
-      this.controls.target.set(0, 0, centroidZ);
+      this.controls.target.set(0, 0, 0);
       this.controls.update();
     }
     this.loadedVehicles.forEach((v) => {
@@ -31118,9 +31123,6 @@ class SceneManager {
     const slot = this.slotGroup.children.find((c) => c.userData.id === slotId);
     if (!slot)
       return;
-    this.cameraTargetPos.set(12, 4, slot.position.z);
-    this.cameraLookAt.set(0, 0, slot.position.z);
-    this.isTransitioning = true;
     if (this.controls)
       this.controls.enabled = false;
     this.motorcadeSpotLights.forEach((light, index) => {
@@ -31142,9 +31144,6 @@ class SceneManager {
     });
   }
   resetMotorcadeCamera() {
-    this.cameraTargetPos.set(25, 8, 0);
-    this.cameraLookAt.set(0, 0, 0);
-    this.isTransitioning = true;
     if (this.controls) {
       this.controls.enabled = true;
       this.controls.update();
@@ -31169,7 +31168,12 @@ class SceneManager {
     });
     const slot = new LineSegments(edges, material);
     slot.position.set(data.x, 0, data.z);
-    slot.userData = { id: data.id, role: data.role, type: "slot" };
+    slot.userData = {
+      id: data.id,
+      role: data.role,
+      allowed_categories: Array.isArray(data.allowed_categories) ? data.allowed_categories : [data.role],
+      type: "slot"
+    };
     const poleGeo = new CylinderGeometry(0.05, 0.05, 2);
     const poleMat = new MeshBasicMaterial({ color: data.color });
     const pole = new Mesh(poleGeo, poleMat);
@@ -31193,7 +31197,11 @@ class SceneManager {
         console.log(`Sentinel: Clicked Slot ${userData.role}`);
         this.focusOnSlot(userData.id);
         document.body.dispatchEvent(new CustomEvent("sentinel-garage-open", {
-          detail: { slotId: userData.id, role: userData.role }
+          detail: {
+            slotId: userData.id,
+            role: userData.role,
+            allowed_categories: Array.isArray(userData.allowed_categories) ? userData.allowed_categories : [userData.role]
+          }
         }));
       }
     }

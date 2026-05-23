@@ -332,6 +332,105 @@ export const SettingsPanel = ({
   );
 };
 
+// ─── activation banner (top of editor) ─────────────────────────────────────
+//
+// Single source of "is this formation actually live in the wizard?" — gates
+// the three states an admin can be in:
+//   • is_default + tier  → green active chip + "stop using" link
+//   • tier, not default  → amber "not active" + one-click activate
+//   • no tier            → amber "no tier" + tier picker + activate
+//
+// Everything flows through POST /admin/formations/:id/activate, which
+// applies the tier (if needed) and the default flag in one round-trip. The
+// server returns HX-Refresh so the settings panel + activation banner both
+// re-render coherently rather than us OOB-swapping multiple fragments.
+
+export const ActivationBanner = ({ f }: { f: Formation }) => {
+  const isArchived = f.status === "archived";
+
+  if (isArchived) {
+    return (
+      <div class="mb-4 px-4 py-3 rounded border border-zinc-700/60 bg-zinc-900/40 flex items-center justify-between">
+        <div class="text-[11px] tracking-widest uppercase text-gray-400">
+          Archived — wizard ignores archived formations. Reactivate to use.
+        </div>
+      </div>
+    );
+  }
+
+  if (f.is_default && f.tier_id) {
+    return (
+      <div class="mb-4 px-4 py-3 rounded border border-green-500/40 bg-green-500/10 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <span class="text-[11px] tracking-widest uppercase text-green-300 font-bold">
+            ● Active in wizard for {f.tier_id}
+          </span>
+          <span class="text-[10px] tracking-widest uppercase text-gray-500">
+            Guests on the {f.tier_id} tier see this layout.
+          </span>
+        </div>
+        <span class="text-[10px] tracking-widest uppercase text-gray-500 italic">
+          To swap, activate a different formation for {f.tier_id}.
+        </span>
+      </div>
+    );
+  }
+
+  // Either no tier, or has tier but isn't the default. Both render the
+  // same one-form widget — the tier select is pre-set when known, free
+  // when not. POST handles the "set tier + activate" combo server-side.
+  //
+  // Layout: status text on top, controls row below. Vertical stack
+  // guarantees the Activate button is always visible regardless of
+  // viewport width — the previous side-by-side layout clipped the button
+  // when the select's natural width pushed the right group off-screen.
+  return (
+    <form
+      class="mb-4 px-4 py-3 rounded border border-amber-500/40 bg-amber-500/10 flex flex-col gap-3"
+      hx-post={`/admin/formations/${f.id}/activate`}
+      hx-swap="none"
+    >
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <span class="text-[11px] tracking-widest uppercase text-amber-300 font-bold whitespace-nowrap">
+          ○ Not active in wizard
+        </span>
+        <span class="text-[10px] tracking-widest uppercase text-gray-400">
+          {f.tier_id
+            ? `Activate to replace the current ${f.tier_id} default.`
+            : "Pick a tier, then activate to make this the wizard layout for that tier."}
+        </span>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <label class="text-[10px] tracking-widest uppercase text-gray-400 shrink-0">
+          Tier:
+        </label>
+        <select
+          name="tier_id"
+          required
+          class="bg-black border border-white/20 text-white text-xs px-2 py-1.5 rounded focus:border-sentinel-accent focus:outline-none min-w-[140px]"
+        >
+          {!f.tier_id && (
+            <option value="" selected disabled>
+              Pick…
+            </option>
+          )}
+          {FORMATION_TIERS.map((t) => (
+            <option value={t} selected={f.tier_id === t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <button
+          type="submit"
+          class="px-4 py-1.5 bg-amber-500 text-black text-[10px] font-bold tracking-widest uppercase hover:bg-amber-400 transition-colors cursor-pointer shrink-0"
+        >
+          Activate
+        </button>
+      </div>
+    </form>
+  );
+};
+
 // ─── legend / palette (no-selection sidebar) ───────────────────────────────
 
 const Legend = () => (
@@ -390,6 +489,8 @@ export const SlotEditorPage = ({
           Wheel zoom · Middle/right (or Space) drag = pan · 0 = fit · Alt = no snap
         </div>
       </header>
+
+      <ActivationBanner f={formation} />
 
       <SettingsPanel f={formation} flash={flash} />
 

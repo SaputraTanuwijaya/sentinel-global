@@ -264,24 +264,63 @@ export const Motorcade = () => {
                        (function() {
                        let currentSlotId = null;
                        let currentRole = null;
+                       // Carries the slot's full allowed_categories from the
+                       // most recent garage-open event. Authoritative for the
+                       // vehicle filter when a slot defines its own role set
+                       // (admin-defined formations); the SLOT_CATEGORIES map
+                       // below is the legacy fallback for any path that
+                       // hasn't been migrated.
+                       let currentAllowedRoles = null;
                        let selectedVehicle = null;
                        let vehicleAmount = 1;
-              
-                       // Wait for Sentinel to be ready
+
+                       // Wait for BOTH Sentinel (3D engine) AND the catalog
+                       // manifest before initialising the motorcade. Without
+                       // the manifest, SceneManager falls back to the
+                       // hardcoded TIER_CONFIG — defeating the admin's
+                       // active formation. The race used to fire whenever
+                       // window.Sentinel existed, which is immediate; the
+                       // manifest fetch takes another ~50-200ms.
+                       let motorcadeInitialized = false;
+                       function tryInitMotorcade() {
+                           if (motorcadeInitialized) return;
+                           if (!document.getElementById('garage-drawer')) return;
+                           if (!window.Sentinel) return;
+                           if (!window.__FORMATIONS__) return;
+                           motorcadeInitialized = true;
+                           const tier = (window.MissionState && window.MissionState.tierName)
+                               ? window.MissionState.tierName
+                               : 'Praetorian';
+                           window.Sentinel.initMotorcadeMode(tier);
+                       }
                        const initInterval = setInterval(() => {
-                           // Abort if Motorcade was swapped out by HTMX
-                           if (!document.getElementById('garage-drawer')) { clearInterval(initInterval); return; }
-                           if (window.Sentinel) {
+                           if (!document.getElementById('garage-drawer')) {
                                clearInterval(initInterval);
-                               const tier = (window.MissionState && window.MissionState.tierName) ? window.MissionState.tierName : 'Praetorian';
-                               window.Sentinel.initMotorcadeMode(tier);
+                               return;
                            }
+                           tryInitMotorcade();
+                           if (motorcadeInitialized) clearInterval(initInterval);
                        }, 100);
-              
-                       // Slot role -> allowed vehicle roles. Each slot
-                       // accepts vehicles whose categories array contains
-                       // its own role. Step 8 (formations + slot editor)
-                       // moves this into per-slot DB rows.
+                       // Also fire on the catalog-ready event in case the
+                       // manifest arrives between polls.
+                       document.body.addEventListener('sentinel-catalog-ready', tryInitMotorcade, { once: true });
+                       // Hard 3s fallback: if the manifest never arrives
+                       // (offline / server error), boot the wizard anyway
+                       // using SceneManager's built-in TIER_CONFIG. Set
+                       // __FORMATIONS__ to {} so tryInit() proceeds.
+                       setTimeout(() => {
+                           if (!motorcadeInitialized && document.getElementById('garage-drawer')) {
+                               console.warn('Sentinel: catalog manifest unavailable after 3s — using fallback layout.');
+                               if (!window.__FORMATIONS__) window.__FORMATIONS__ = {};
+                               tryInitMotorcade();
+                           }
+                       }, 3000);
+
+                       // Legacy single-role fallback. Used when the slot
+                       // doesn't carry its own allowed_categories (older
+                       // SceneManager builds, or a race condition where the
+                       // event detail lacks the new field). New code paths
+                       // should prefer currentAllowedRoles.
                        const SLOT_CATEGORIES = {
                            PRINCIPAL: ['PRINCIPAL'],
                            LEAD:      ['LEAD'],
@@ -311,9 +350,16 @@ export const Motorcade = () => {
                        // Build the role -> [vehicles] map from the catalog
                        // manifest. Called fresh on every garage open so
                        // edits to /admin/vehicles surface on the next pick.
+                       // Prefer the current slot's allowed_categories
+                       // (carried in the garage-open event detail) — admin
+                       // formations can define multi-role slots that the
+                       // legacy SLOT_CATEGORIES map can't express.
                        function buildVehiclesForRole(role) {
                            const catalog = window.__VEHICLES__ || {};
-                           const allowedRoles = SLOT_CATEGORIES[role] || [];
+                           const allowedRoles =
+                               (Array.isArray(currentAllowedRoles) && currentAllowedRoles.length > 0)
+                                   ? currentAllowedRoles
+                                   : (SLOT_CATEGORIES[role] || [role]);
                            const matches = Object.values(catalog)
                               .filter(v => {
                                   const cats = Array.isArray(v.categories) ? v.categories : [v.category];
@@ -334,11 +380,18 @@ export const Motorcade = () => {
                            document.body.removeEventListener('sentinel-garage-open', window._garageOpenHandler);
                        }
                        window._garageOpenHandler = (e) => {
-                           const { slotId, role } = e.detail;
+                           const { slotId, role, allowed_categories } = e.detail;
                            currentSlotId = slotId;
                            currentRole = role;
+                           // The slot's full role set drives the drawer filter.
+                           // SceneManager populates this from the formation row;
+                           // it may be missing for older callers, so default to
+                           // [role] (matches the legacy hardcoded behaviour).
+                           currentAllowedRoles = (Array.isArray(allowed_categories) && allowed_categories.length > 0)
+                               ? allowed_categories
+                               : [role];
                            vehicleAmount = 1; // Reset
-                           
+
                            // Update Title
                            document.getElementById('slot-role-title').innerText = role;
                            backToGarage(); // Ensure we start at selection view
