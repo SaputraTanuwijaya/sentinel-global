@@ -30608,7 +30608,6 @@ class SceneManager {
   renderer;
   controls = null;
   bgMesh = null;
-  currentTheme = "";
   videoCache = new Map;
   activeVideoPath = null;
   VIDEO_MAP = {
@@ -30628,28 +30627,17 @@ class SceneManager {
   raycaster = new Raycaster;
   mouse = new Vector2;
   resizeTimer = null;
+  static DEFAULT_SLOTS = [
+    { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
+    { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
+    { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
+    { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
+    { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
+  ];
   TIER_CONFIG = {
-    Vanguard: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
-    ],
-    Sentinel: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
-    ],
-    Praetorian: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 65535 },
-      { id: 1, role: "LEAD", allowed_categories: ["LEAD"], x: 0, z: 10, color: 8947848 },
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 16766720 },
-      { id: 3, role: "CAT", allowed_categories: ["CAT"], x: 0, z: -10, color: 16729156 },
-      { id: 4, role: "ECM", allowed_categories: ["ECM"], x: 0, z: -20, color: 4474111 }
-    ]
+    Vanguard: [...SceneManager.DEFAULT_SLOTS],
+    Sentinel: [...SceneManager.DEFAULT_SLOTS],
+    Praetorian: [...SceneManager.DEFAULT_SLOTS]
   };
   ROLE_COLOR_HEX = {
     PRINCIPAL: 15381256,
@@ -30935,15 +30923,16 @@ class SceneManager {
     } else {
       this.formationGroup.visible = true;
     }
-    if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
+    const manifest = window.__DRESSCODES__;
+    const resolvedPath = manifest?.[themeId]?.video_path ?? this.VIDEO_MAP[themeId] ?? null;
+    if (themeId === "black" || !resolvedPath) {
       if (this.bgMesh)
         this.bgMesh.visible = false;
       this.pauseAllVideos();
       this.activeVideoPath = null;
-      this.currentTheme = "black";
       return;
     }
-    const videoPath = this.VIDEO_MAP[themeId];
+    const videoPath = resolvedPath;
     this.pauseAllVideos();
     if (!this.bgMesh) {
       this.initBgMesh();
@@ -30992,7 +30981,7 @@ class SceneManager {
       side: DoubleSide
     });
     this.bgMesh = new Mesh(geometry, material);
-    this.bgMesh.position.set(0, -1, -3.5);
+    this.bgMesh.position.set(0, -2, -3.5);
     this.scene.add(this.bgMesh);
   }
   initMotorcadeMode(tier = "Vanguard") {

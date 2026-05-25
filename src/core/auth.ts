@@ -25,11 +25,14 @@ export const userContext = new Elysia({ name: "user-context" }).derive(
 );
 
 // ── Admin (single password, JWT in `auth` cookie) ───────────────────────────
+// Both miss-paths route to the unified /auth/login (email='admin' lane). The
+// legacy /login + /api/login flow is being retired — see src/views/Login.tsx
+// and the GET/POST /login routes in src/index.tsx (slated for removal in P2).
 export const requireAdmin = async ({ jwt, cookie }: any) => {
   const token = cookie.auth?.value;
-  if (!token) return redirect("/login");
+  if (!token) return redirect("/auth/login");
   const payload = await jwt.verify(token);
-  if (!payload || payload.sub !== "admin") return redirect("/login");
+  if (!payload || payload.sub !== "admin") return redirect("/auth/login");
 };
 
 // ── End-user guards (require userContext to be applied first) ───────────────

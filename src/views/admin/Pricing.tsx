@@ -1,12 +1,11 @@
 import { Html } from "@elysiajs/html";
 import type { PricingRule } from "../../services/PricingService";
+import type { Vehicle } from "../../services/VehicleService";
 
 const CATEGORY_TITLE: Record<string, string> = {
   base: "Base rates",
   tier: "Tier surcharges",
-  vehicle_role: "Vehicle role rates",
   dress: "Dress code multipliers",
-  vehicle_category: "Vehicle category prices",
   duration: "Duration",
 };
 
@@ -127,7 +126,13 @@ const groupByCategory = (rules: PricingRule[]) => {
   return groups;
 };
 
-export const PricingMatrix = ({ rules }: { rules: PricingRule[] }) => {
+export const PricingMatrix = ({
+  rules,
+  vehicles,
+}: {
+  rules: PricingRule[];
+  vehicles: Vehicle[];
+}) => {
   const groups = groupByCategory(rules);
   return (
     <div class="max-w-4xl">
@@ -168,7 +173,61 @@ export const PricingMatrix = ({ rules }: { rules: PricingRule[] }) => {
             </table>
           </section>
         ))}
+
+        <VehiclePricesSection vehicles={vehicles} />
       </div>
     </div>
   );
 };
+
+// ─── per-vehicle prices (read-only here; edit lives in /admin/vehicles) ─────
+
+const VehiclePricesSection = ({ vehicles }: { vehicles: Vehicle[] }) => (
+  <section class="bg-zinc-950 border border-white/10 rounded overflow-hidden">
+    <h2 class="px-6 py-3 bg-zinc-900 border-b border-white/10 text-xs tracking-widest uppercase text-gray-400 font-normal flex items-center justify-between">
+      <span>Vehicle prices</span>
+      <span class="text-[9px] text-gray-600 normal-case tracking-wide">
+        Read-only. Edit on each vehicle's page.
+      </span>
+    </h2>
+    {vehicles.length === 0 ? (
+      <div class="p-6 text-gray-500 text-xs tracking-widest uppercase">
+        No active vehicles.
+      </div>
+    ) : (
+      <table class="w-full text-left border-collapse">
+        <tbody class="text-sm">
+          {vehicles.map((v) => (
+            <tr class="border-b border-white/5 last:border-b-0">
+              <td class="p-4 align-top w-1/4">
+                <div class="text-white">{v.label}</div>
+                <div class="text-[10px] text-gray-600 tracking-widest uppercase mt-1">
+                  {v.id}
+                </div>
+              </td>
+              <td class="p-4 align-top text-gray-400 text-xs">
+                {v.categories.join(" · ")}
+              </td>
+              <td class="p-4 align-top w-[220px]">
+                <div class="flex items-center justify-between gap-3 min-w-[180px]">
+                  <span class="text-white text-sm tabular-nums">
+                    {formatCents(v.price_cents)}
+                    <span class="text-gray-500 text-[10px] tracking-widest uppercase ml-1">
+                      /hr
+                    </span>
+                  </span>
+                  <a
+                    href={`/admin/vehicles/${encodeURIComponent(v.id)}`}
+                    class="text-[10px] tracking-widest uppercase text-gray-500 hover:text-sentinel-accent"
+                  >
+                    [edit]
+                  </a>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </section>
+);

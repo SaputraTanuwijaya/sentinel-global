@@ -126,13 +126,20 @@ export const Layout = ({ children }: { children: any }) => {
                }
 
                // ── MissionState persistence ─────────────────────────────────
-               // Survives auth round-trips: if a guest tries to checkout, we
-               // bounce them to /auth/login and back via ?resume=/step/X.
-               // Without persistence they'd lose every selection they made.
+               // sessionStorage (not localStorage) so abandoned wizards don't
+               // resurrect days later with stale pricing. Scope = current tab:
+               //   - Survives reload, HTMX swaps, and the auth round-trip
+               //     (HX-Redirect → /auth/login → /?resume=/step/X all happen
+               //     in the same tab, which is what sessionStorage covers).
+               //   - DOESN'T survive tab close — exactly what we want for
+               //     guests who walk away mid-flow. Next visit = fresh state.
                // Cleared explicitly in CheckoutSuccess once the mission is
-               // saved server-side. Storage key is namespaced so it's easy
-               // to identify in DevTools.
+               // saved server-side. Storage key is namespaced for DevTools.
                const STATE_KEY = 'sentinel.missionState';
+               // Wipe the old localStorage entry left by the previous build
+               // so users with persisted state from before this change get a
+               // clean slate on first visit after deploy.
+               try { localStorage.removeItem(STATE_KEY); } catch (e) {}
                const DEFAULT_STATE = {
                   principalCount: 1,
                   tierName: 'Vanguard',
@@ -141,7 +148,7 @@ export const Layout = ({ children }: { children: any }) => {
                };
                const loadSavedState = () => {
                   try {
-                      const raw = localStorage.getItem(STATE_KEY);
+                      const raw = sessionStorage.getItem(STATE_KEY);
                       if (!raw) return null;
                       const parsed = JSON.parse(raw);
                       return (parsed && typeof parsed === 'object') ? parsed : null;
@@ -149,11 +156,11 @@ export const Layout = ({ children }: { children: any }) => {
                };
                window.MissionState = Object.assign({}, DEFAULT_STATE, loadSavedState() || {});
                window.__saveMissionState = () => {
-                  try { localStorage.setItem(STATE_KEY, JSON.stringify(window.MissionState)); }
+                  try { sessionStorage.setItem(STATE_KEY, JSON.stringify(window.MissionState)); }
                   catch (e) {}
                };
                window.__clearMissionState = () => {
-                  try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+                  try { sessionStorage.removeItem(STATE_KEY); } catch (e) {}
                   window.MissionState = Object.assign({}, DEFAULT_STATE);
                };
 
@@ -170,7 +177,11 @@ export const Layout = ({ children }: { children: any }) => {
                const cents = window.__centsFor;
                const principalRate = ()      => cents('base.per_principal_hour');
                const tierRate     = (name)   => cents('tier.' + name);
-               const roleRate     = (role)   => cents('vehicle_role.' + role);
+               // Vehicle prices come from window.__VEHICLES__ (per-row
+               // price_cents), not the pricing rules map — see the unify
+               // migration. Returns 0 if the manifest hasn't loaded yet or
+               // the id has been archived since the user picked it.
+               const vehicleRate  = (id)     => Number(((window.__VEHICLES__ || {})[id] || {}).price_cents || 0);
                const $          = (centsAmt) => '$' + (Number(centsAmt) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
                // Boot fetch — wizard reads from the same catalog the server uses
@@ -186,6 +197,12 @@ export const Layout = ({ children }: { children: any }) => {
                      // (model_path) and Motorcade.tsx (label, thumbnail).
                      window.__VEHICLES__ = {};
                      for (const v of (m.vehicles || [])) window.__VEHICLES__[v.id] = v;
+                     // Dresscodes indexed by id. SceneManager.changeBackground
+                     // reads video_path from here; falls back to its internal
+                     // VIDEO_MAP for the seeded slugs when the manifest is
+                     // unavailable or the entry is missing.
+                     window.__DRESSCODES__ = {};
+                     for (const d of (m.dresscodes || [])) window.__DRESSCODES__[d.id] = d;
                      // Formation defaults are the source of truth for the
                      // motorcade slot layout. SceneManager reads this in
                      // initMotorcadeMode; falls back to its built-in
@@ -261,26 +278,30 @@ export const Layout = ({ children }: { children: any }) => {
                     \`;
                   }
 
-                  // === Motorcade
+                  // === Motorcade — group by vehicle id (not role) since
+                  // pricing is per-vehicle now. Same vehicle in two slots
+                  // collapses to one line.
                   let motorcadeHtml = '';
                   let motorcadeCents = 0;
 
-                  // Group vehicles by role
-                  const roleCounts = {};
+                  const vehicleCounts = {};
                   if (state.motorcade) {
                       Object.values(state.motorcade).forEach(v => {
                         if (v.id !== 'none') {
-                            roleCounts[v.role] = (roleCounts[v.role] || 0) + v.amount;
+                            vehicleCounts[v.id] = (vehicleCounts[v.id] || 0) + v.amount;
                         }
                       });
                   }
 
-                  Object.entries(roleCounts).forEach(([role, count]) => {
-                    const lineCents = count * roleRate(role);
+                  const catalog = window.__VEHICLES__ || {};
+                  Object.entries(vehicleCounts).forEach(([id, count]) => {
+                    const entry = catalog[id];
+                    const label = (entry && entry.label) ? entry.label : id;
+                    const lineCents = count * vehicleRate(id);
                     motorcadeCents += lineCents;
                     motorcadeHtml += \`
                         <div class="flex justify-between text-white">
-                            <span>\${count} \${role.replace('_', ' ')}</span>
+                            <span>\${count} \${label}</span>
                             <span>\${$(lineCents)}/HR</span>
                         </div>
                     \`;

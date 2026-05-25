@@ -11,7 +11,6 @@ export class SceneManager {
   private renderer: THREE.WebGLRenderer;
   private controls: OrbitControls | null = null;
   private bgMesh: THREE.Mesh | null = null;
-  private currentTheme: string = "";
 
   // Video Cache: one HTMLVideoElement + VideoTexture per video path (never mutate src)
   private videoCache: Map<
@@ -20,7 +19,14 @@ export class SceneManager {
   > = new Map();
   private activeVideoPath: string | null = null;
 
-  // Configuration: Map IDs to file paths
+  // Fallback path map for the seeded dresscode slugs. The primary source is
+  // window.__DRESSCODES__[id].video_path, populated by the Layout boot script
+  // from /api/catalog/manifest.json (single source of truth = the dresscodes
+  // table). This map is consulted only when:
+  //   - the manifest hasn't loaded yet (boot race), OR
+  //   - the requested id has no manifest entry but matches a seeded slug.
+  // Admin-created dresscodes outside this list resolve exclusively through
+  // the manifest — that's the whole reason the lookup is no longer hardcoded.
   private readonly VIDEO_MAP: Record<string, string> = {
     business_formal: "/public/assets/videos/business_formal.mp4",
     casual_formal: "/public/assets/videos/business_casual.mp4",
@@ -53,28 +59,17 @@ export class SceneManager {
   // `formations` + `slots` tables (see `FormationService.activeDefaultsByTier`).
   // Identical across tiers here to match the v1 behaviour exactly; the seed
   // in `scripts/migrate-admin.ts` mirrors this and admins can diverge.
+  private static readonly DEFAULT_SLOTS = [
+    { id: 0, role: "SWEEPER",   allowed_categories: ["SWEEPER"],   x: 0, z:  20, color: 0x00ffff }, // Cyan
+    { id: 1, role: "LEAD",      allowed_categories: ["LEAD"],      x: 0, z:  10, color: 0x888888 }, // Gray
+    { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z:   0, color: 0xffd700 }, // Gold
+    { id: 3, role: "CAT",       allowed_categories: ["CAT"],       x: 0, z: -10, color: 0xff4444 }, // Red
+    { id: 4, role: "ECM",       allowed_categories: ["ECM"],       x: 0, z: -20, color: 0x4444ff }, // Blue
+  ] as const;
   private readonly TIER_CONFIG: Record<string, any[]> = {
-    Vanguard: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff }, // Cyan
-      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 }, // Gray
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 }, // Gold
-      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 }, // Red
-      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff }, // Blue
-    ],
-    Sentinel: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff },
-      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 },
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 },
-      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff },
-    ],
-    Praetorian: [
-      { id: 0, role: "SWEEPER", allowed_categories: ["SWEEPER"], x: 0, z: 20, color: 0x00ffff },
-      { id: 1, role: "LEAD",    allowed_categories: ["LEAD"],    x: 0, z: 10, color: 0x888888 },
-      { id: 2, role: "PRINCIPAL", allowed_categories: ["PRINCIPAL"], x: 0, z: 0, color: 0xffd700 },
-      { id: 3, role: "CAT",     allowed_categories: ["CAT"],     x: 0, z: -10, color: 0xff4444 },
-      { id: 4, role: "ECM",     allowed_categories: ["ECM"],     x: 0, z: -20, color: 0x4444ff },
-    ],
+    Vanguard:   [...SceneManager.DEFAULT_SLOTS],
+    Sentinel:   [...SceneManager.DEFAULT_SLOTS],
+    Praetorian: [...SceneManager.DEFAULT_SLOTS],
   };
 
   // Role → hex colour for slot rings + spotlight pools. Mirrors the swatch
@@ -305,14 +300,6 @@ export class SceneManager {
       if (removed) this.formationGroup.remove(removed);
     }
 
-    // this.principalInstances.forEach((model, index) => {
-    //   const targetPos = this.getFormationOffset(index, count);
-
-    //   // TODO : Upgrade slide animations or choose to instantly position
-    //   model.position.copy(targetPos);
-    //   model.lookAt(0, 0, 10);
-    // });
-
     const spacing = 1.2;
     let offsets: THREE.Vector3[] = [];
 
@@ -349,7 +336,6 @@ export class SceneManager {
       pos: inst.position,
     }));
 
-    // this.targetPositions = offsets;
     this.targetPositions = new Array(count).fill(null);
 
     unassignedSlots.forEach((slot) => {
@@ -377,26 +363,6 @@ export class SceneManager {
       if (!pos && offsets[i]) this.targetPositions[i] = offsets[i];
     });
   }
-
-  // private getFormationOffset(index: number, total: number): THREE.Vector3 {
-  //   const spacing = 1.0;
-
-  //   // 1 Person: Center
-  //   if (total === 1) return new THREE.Vector3(0, 0, 0);
-
-  //   // 2 People: Side by Side
-  //   if (total === 2) {
-  //     return new THREE.Vector3((index === 0 ? -0.5 : 0.5) * spacing, 0, 0);
-  //   }
-
-  //   // 3+ People: Wedge (Triangle)
-  //   if (index === 0) return new THREE.Vector3(0, 0, 0);
-
-  //   const row = Math.floor((index + 1) / 2);
-  //   const side = index % 2 === 0 ? 1 : -1;
-
-  //   return new THREE.Vector3(side * spacing * row, 0, -spacing * row);
-  // }
 
   private onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
@@ -454,10 +420,6 @@ export class SceneManager {
   }
 
   public changeBackground(themeId: string): void {
-    // if (this.currentTheme === themeId) return;
-    // this.currentTheme = themeId;
-
-    // Debug theme
     console.log(`Sentinel 3D: Switching to [${themeId}]`);
 
     // Guard: Reject stale calls from old view scripts (e.g. Rendezvous
@@ -492,15 +454,24 @@ export class SceneManager {
       this.formationGroup.visible = true;
     }
 
-    if (themeId === "black" || !this.VIDEO_MAP[themeId]) {
+    // Prefer the admin-managed manifest entry; fall back to the seeded slug
+    // map. Either source can be missing on slow first paint or for an id that
+    // doesn't exist anywhere — in that case bail to the black background
+    // rather than try to load nothing.
+    const manifest = (window as any).__DRESSCODES__ as
+      | Record<string, { video_path?: string | null }>
+      | undefined;
+    const resolvedPath =
+      manifest?.[themeId]?.video_path ?? this.VIDEO_MAP[themeId] ?? null;
+
+    if (themeId === "black" || !resolvedPath) {
       if (this.bgMesh) this.bgMesh.visible = false;
       this.pauseAllVideos();
       this.activeVideoPath = null;
-      this.currentTheme = "black";
       return;
     }
 
-    const videoPath = this.VIDEO_MAP[themeId];
+    const videoPath = resolvedPath;
 
     // Pause every cached video before switching
     this.pauseAllVideos();
@@ -538,7 +509,6 @@ export class SceneManager {
     // Play from the start — guard against play/pause race condition
     entry.video.currentTime = 0;
     entry.video.play().catch(() => {});
-    // this.currentTheme = themeId;
   }
 
   /**
@@ -594,8 +564,10 @@ export class SceneManager {
     });
 
     this.bgMesh = new THREE.Mesh(geometry, material);
-    // Keep in sync with the re-set in changeBackground().
-    this.bgMesh.position.set(0, -1, -3.5);
+    // Must match the position used in changeBackground(); otherwise the first
+    // paint sits at one y and the first theme change snaps to another, producing
+    // a visible vertical jump on the wizard's first entry.
+    this.bgMesh.position.set(0, -2, -3.5);
     this.scene.add(this.bgMesh);
   }
 
@@ -888,7 +860,6 @@ export class SceneManager {
     );
 
     if (intersects.length > 0) {
-      // Since type could be undefined maybe use optional chaining and add (?) behind array and userData
       const userData = intersects[0]?.object.userData;
       if (userData?.type === "slot") {
         console.log(`Sentinel: Clicked Slot ${userData.role}`);

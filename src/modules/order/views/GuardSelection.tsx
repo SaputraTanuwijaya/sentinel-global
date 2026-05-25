@@ -60,7 +60,8 @@ export const GuardSelection = () => {
             urban environments.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            +$0 <span class="text-sm text-gray-500">USD / HR</span>
+            +$<span id="tier-price-Vanguard">0</span>{" "}
+            <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-300 flex-1">
@@ -107,7 +108,8 @@ export const GuardSelection = () => {
             Tactical protection unit with threat assessment capabilities.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            +$150 <span class="text-sm text-gray-500">USD / HR</span>
+            +$<span id="tier-price-Sentinel">150</span>{" "}
+            <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-200 flex-1">
@@ -158,7 +160,8 @@ export const GuardSelection = () => {
             State-level maximum security. Proactive threat neutralization.
           </p>
           <div class="text-3xl font-mono text-white mb-8">
-            +$400 <span class="text-sm text-gray-500">USD / HR</span>
+            +$<span id="tier-price-Praetorian">400</span>{" "}
+            <span class="text-sm text-gray-500">USD / HR</span>
           </div>
 
           <ul class="space-y-4 mb-8 text-sm text-gray-300 flex-1">
@@ -198,6 +201,48 @@ export const GuardSelection = () => {
           </button>
         </div>
       </div>
+
+      {/* Tier prices come from window.__PRICING__['tier.{Name}'] (populated
+          by Layout's boot fetch from /api/catalog/manifest.json). Hardcoded
+          literals in the markup are the slow-network fallback; this script
+          overwrites them with the live admin-edited values as soon as the
+          manifest resolves. IIFE per CLAUDE.md HTMX convention; update() is
+          idempotent so a re-swap into /step/2 just re-renders the prices. */}
+      <script>
+        {`
+          (function() {
+            const TIERS = ['Vanguard', 'Sentinel', 'Praetorian'];
+            const update = () => {
+              const pricing = window.__PRICING__ || {};
+              TIERS.forEach((name) => {
+                const el = document.getElementById('tier-price-' + name);
+                if (!el) return;
+                const cents = Number(pricing['tier.' + name]);
+                if (!Number.isFinite(cents)) return;
+                el.innerText = (cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+              });
+            };
+
+            // Common case: manifest already resolved (it loads on Layout boot,
+            // before the user can reach /step/2). Update in place; no listener
+            // needed.
+            if (window.__PRICING__) {
+              update();
+              return;
+            }
+
+            // Cold case: user landed here before the manifest fetch resolved.
+            // Register exactly one body-level listener for the rest of the
+            // session; the dataset flag prevents stacking duplicate handlers
+            // on subsequent HTMX swaps. The listener stays alive across swaps
+            // and re-runs update() against whatever spans are in the current
+            // DOM each time the event fires.
+            if (document.body.dataset.tierPricesWired === '1') return;
+            document.body.dataset.tierPricesWired = '1';
+            document.body.addEventListener('sentinel-catalog-ready', update);
+          })();
+        `}
+      </script>
 
       <style>
         {`

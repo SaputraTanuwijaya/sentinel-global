@@ -359,11 +359,18 @@ export const Checkout = () => {
 
             // Server-driven catalog. Boot fetch happens in Layout; if a user
             // lands here in an edge case before it resolved, trigger one.
+            // Populate both __PRICING__ AND __VEHICLES__ — the motorcade line
+            // now reads per-vehicle prices from the latter.
             const ensurePricing = () => {
-              if (window.__PRICING__) return Promise.resolve();
+              if (window.__PRICING__ && window.__VEHICLES__) return Promise.resolve();
               return fetch('/api/catalog/manifest.json')
                 .then(r => r.ok ? r.json() : null)
-                .then(m => { if (m) window.__PRICING__ = m.pricing || {}; })
+                .then(m => {
+                  if (!m) return;
+                  window.__PRICING__ = m.pricing || {};
+                  window.__VEHICLES__ = window.__VEHICLES__ || {};
+                  for (const v of (m.vehicles || [])) window.__VEHICLES__[v.id] = v;
+                })
                 .catch(() => {});
             };
             const cents = (k) => Number((window.__PRICING__ || {})[k] || 0);
@@ -415,12 +422,16 @@ export const Checkout = () => {
                 </div>
               \`;
 
+              // Per-vehicle pricing: each selection costs its own
+              // vehicles.price_cents, not a role-bucket rate.
+              const catalog = window.__VEHICLES__ || {};
               let mCents = 0;
               if (state.motorcade) {
                 Object.values(state.motorcade).forEach((v) => {
-                  if (v.id !== 'none') {
-                    mCents += v.amount * cents('vehicle_role.' + v.role);
-                  }
+                  if (v.id === 'none') return;
+                  const entry = catalog[v.id];
+                  const unitCents = entry ? Number(entry.price_cents || 0) : 0;
+                  mCents += v.amount * unitCents;
                 });
               }
               if (mCents > 0) {

@@ -1,6 +1,7 @@
 import { db } from "../core/db";
 import type { MissionState } from "../modules/order/models/Mission";
 import { PricingService } from "./PricingService";
+import { VehicleService } from "./VehicleService";
 
 // Tracks which missing keys we've already warned about, so the log doesn't
 // fill up if an admin archives a row that's referenced every checkout.
@@ -30,12 +31,21 @@ export class MissionService {
     let hourlyCents = pCount * cents("base.per_principal_hour");
     hourlyCents += cents(`tier.${tName}`);
 
+    // Vehicle prices live on `vehicles.price_cents` (per-row), not on the
+    // pricing_rules matrix. Build an id→price map from the active catalog;
+    // a vehicle archived between pick-time and checkout would be missing
+    // here and warns-then-0 rather than crashing the checkout.
     if (state.motorcade) {
+      const vehicles = await VehicleService.listActive();
+      const priceById = new Map(vehicles.map((v) => [v.id, v.price_cents]));
       Object.values(state.motorcade).forEach((v) => {
-        if (v.id !== "none") {
-          hourlyCents +=
-            (Number(v.amount) || 0) * cents(`vehicle_role.${v.role}`);
+        if (v.id === "none") return;
+        const unitCents = priceById.get(v.id);
+        if (unitCents == null) {
+          warnMissingKey(`vehicle:${v.id}`);
+          return;
         }
+        hourlyCents += (Number(v.amount) || 0) * unitCents;
       });
     }
 
@@ -43,11 +53,19 @@ export class MissionService {
     const missionId =
       "OP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
+    // Rendezvous columns are NULLable so rows from before the columns existed
+    // still validate; here we write whatever the wizard sent. The route layer
+    // validates lat/lng bounds and time length so we don't re-check.
+    const locLat = state.location?.lat ?? null;
+    const locLng = state.location?.lng ?? null;
+    const rendezvousAt = state.time ?? null;
+
     await db.execute({
       sql: `INSERT INTO missions (
-          id, user_email, principal_count, tier_name, dress_code_id, 
-          motorcade_json, total_cost_cents, duration_hours, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, user_email, principal_count, tier_name, dress_code_id,
+          motorcade_json, total_cost_cents, duration_hours, status,
+          location_lat, location_lng, rendezvous_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         missionId,
         userEmail,
@@ -58,6 +76,9 @@ export class MissionService {
         totalCostCents,
         duration,
         "authorized",
+        locLat,
+        locLng,
+        rendezvousAt,
       ],
     });
 

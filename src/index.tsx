@@ -1,11 +1,8 @@
 import "./core/env"; // boot-time validation — throws on missing vars
-import { timingSafeEqual } from "crypto";
-import { Elysia, redirect, t } from "elysia";
+import { Elysia } from "elysia";
 import { html, Html } from "@elysiajs/html";
 import { staticPlugin } from "@elysiajs/static";
 import { Layout } from "./views/layout";
-import { LoginPage } from "./views/Login";
-import { env } from "./core/env";
 import { jwtPlugin, userContext } from "./core/auth";
 import { orderRouter } from "./modules/order/router.tsx";
 import { authRouter } from "./modules/auth/router.tsx";
@@ -111,58 +108,6 @@ const app = new Elysia()
         </div>
       </Layout>
     );
-  })
-
-  // ── Admin auth (separate flow from end-user auth) ─────────────────────────
-
-  .get("/login", ({ cookie }) => {
-    if (cookie.auth?.value) return redirect("/admin");
-    return <LoginPage />;
-  })
-
-  .post(
-    "/api/login",
-    async ({ jwt, cookie, body, set }) => {
-      if (!cookie.auth) {
-        set.status = 500;
-        return "Authentication cookie is not configured.";
-      }
-
-      const pwdBuf = Buffer.from(body.password);
-      const expectedBuf = Buffer.from(env.ADMIN_PASSWORD);
-
-      // Always run a fixed-length comparison to prevent timing attacks
-      const safeLen = Math.max(pwdBuf.length, expectedBuf.length);
-      const a = Buffer.alloc(safeLen);
-      const b = Buffer.alloc(safeLen);
-      pwdBuf.copy(a);
-      expectedBuf.copy(b);
-      const match =
-        pwdBuf.length === expectedBuf.length && timingSafeEqual(a, b);
-
-      if (!match) {
-        set.status = 401;
-        return <LoginPage error="Invalid access key." />;
-      }
-
-      const token = await jwt.sign({ sub: "admin" });
-      cookie.auth.set({
-        value: token,
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 12,
-        secure: env.NODE_ENV === "production",
-      });
-
-      return redirect("/admin");
-    },
-    { body: t.Object({ password: t.String() }) },
-  )
-
-  .post("/api/logout", ({ cookie }) => {
-    cookie.auth?.remove();
-    return redirect("/login");
   })
 
   .listen(3000);

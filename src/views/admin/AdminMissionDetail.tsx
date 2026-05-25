@@ -12,6 +12,17 @@ const fmtCost = (cents: number | null | undefined) =>
 const fmtDate = (raw: string | null | undefined) =>
   raw ? String(raw).slice(0, 19).replace("T", " ") : "—";
 
+const fmtLatLng = (
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+) => {
+  if (lat == null || lng == null) return "—";
+  const a = Number(lat);
+  const b = Number(lng);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "—";
+  return `${a.toFixed(4)}, ${b.toFixed(4)}`;
+};
+
 const Field = ({ label, children }: { label: string; children: any }) => (
   <div class="flex flex-col gap-1">
     <div class="text-[10px] tracking-widest uppercase text-gray-500">
@@ -74,6 +85,8 @@ export const AdminMissionDetail = ({ mission }: { mission: any }) => {
           <span class="text-green-400">{fmtCost(mission.total_cost_cents)}</span>
         </Field>
         <Field label="Created">{fmtDate(mission.created_at)}</Field>
+        <Field label="Rendezvous">{fmtDate(mission.rendezvous_at)}</Field>
+        <Field label="Coordinates">{fmtLatLng(mission.location_lat, mission.location_lng)}</Field>
       </section>
 
       <section class="bg-zinc-950 border border-white/10 rounded p-6 mb-8">

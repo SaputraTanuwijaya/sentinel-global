@@ -6,13 +6,9 @@ import { PricingService } from "../../services/PricingService";
 import { DresscodeService } from "../../services/DresscodeService";
 import {
   VehicleService,
-  VEHICLE_CATEGORIES,
   VEHICLE_SLUG_RE,
 } from "../../services/VehicleService";
-import {
-  FormationService,
-  FORMATION_TIERS,
-} from "../../services/FormationService";
+import { FormationService } from "../../services/FormationService";
 import { AdminLayout } from "../../views/admin/AdminLayout";
 import {
   AdminDashboard,
@@ -204,10 +200,13 @@ export const adminRouter = new Elysia({ prefix: "/admin" })
     "/pricing",
     async () => {
       try {
-        const rules = await PricingService.getAll();
+        const [rules, vehicles] = await Promise.all([
+          PricingService.getAll(),
+          VehicleService.listActive(),
+        ]);
         return (
           <AdminLayout title="Pricing" active="pricing">
-            <PricingMatrix rules={rules} />
+            <PricingMatrix rules={rules} vehicles={vehicles} />
           </AdminLayout>
         );
       } catch (err: any) {

@@ -360,54 +360,10 @@ const PRICING: PricingRule[] = [
     value_cents: 40000,
     value_multiplier: null,
   },
-  {
-    key: "vehicle_role.PRINCIPAL",
-    category: "vehicle_role",
-    label: "Principal slot",
-    description: "Hourly rate per vehicle in the principal slot.",
-    value_cents: 10000,
-    value_multiplier: null,
-  },
-  {
-    key: "vehicle_role.SWEEPER",
-    category: "vehicle_role",
-    label: "Sweeper",
-    description: "Hourly rate per sweeper unit.",
-    value_cents: 3000,
-    value_multiplier: null,
-  },
-  {
-    key: "vehicle_role.LEAD",
-    category: "vehicle_role",
-    label: "Lead",
-    description: "Hourly rate per lead unit.",
-    value_cents: 7000,
-    value_multiplier: null,
-  },
-  {
-    key: "vehicle_role.CAT",
-    category: "vehicle_role",
-    label: "CAT",
-    description: "Hourly rate per counter-assault unit.",
-    value_cents: 15000,
-    value_multiplier: null,
-  },
-  {
-    key: "vehicle_role.ECM",
-    category: "vehicle_role",
-    label: "ECM",
-    description: "Hourly rate per ECM unit.",
-    value_cents: 20000,
-    value_multiplier: null,
-  },
-  {
-    key: "vehicle_role.REAR",
-    category: "vehicle_role",
-    label: "Rear",
-    description: "Hourly rate per rear-guard unit.",
-    value_cents: 7000,
-    value_multiplier: null,
-  },
+  // Vehicle pricing lives on the `vehicles` table now (per-row `price_cents`).
+  // The old `vehicle_role.*` rules were retired by
+  // scripts/migrate-pricing-vehicle-unify.ts — re-adding them here would
+  // resurrect a duplicate, conflicting source of truth. Don't.
 ];
 
 // ─── Run ────────────────────────────────────────────────────────────────────
